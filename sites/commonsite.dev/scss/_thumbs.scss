@@ -1,0 +1,91 @@
+@import "variables";
+
+.thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  justify-content: center;
+}
+
+.thumb {
+  flex-grow: 1;
+  flex-basis: 300px;
+  max-width: 340px;
+  min-width: 260px;
+  margin: 5px;
+  position: relative;
+  @media screen and (max-width: 750px) {
+    min-width: 220px;
+    flex-basis: 220px;
+  }
+  @media screen and (max-width: 450px) {
+    min-width: 160px;
+    flex-basis: 160px;
+  }
+  figure > a, figure > .a-holder {
+    display: block;
+    position: relative;
+    padding-top: 56.47%;
+    overflow: hidden;
+  }
+  figcaption {
+    line-height: 1.5;
+    a {
+      color: $text-color;
+      text-decoration: none;
+      border-bottom: 1px dotted $text-color;
+    }
+  }
+  img, iframe {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: auto;
+    //vertical-align: middle;
+  }
+  iframe {
+    height: 100%;
+  }
+  .title {
+    font-size: 1.1rem;
+  }
+  .title-niche {
+    font-size: 1.5rem;
+    text-align: center;
+    font-weight: bold;
+  }
+  .channel, .duration, .dated, .cat-total, .flag {
+    position: absolute;
+    background-color: #f2f2f2;
+    color: #000000;
+    font-weight: bold;
+    padding: 5px;
+    border-radius: 3px;
+    opacity: 0.5;
+    i {
+      padding-right: 4px;
+    }
+  }
+  .channel {
+    top: 5px;
+    right: 5px;
+  }
+  .dated {
+    top: 5px;
+    left: 5px;
+  }
+  .cat-total, .duration {
+    bottom: 5px;
+    right: 5px;
+  }
+  .flag {
+    bottom: 5px;
+    left: 5px;
+  }
+
+  transition: all 50ms linear;
+  &:hover {
+    transform: scale(1.015);
+  }
+}

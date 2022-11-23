@@ -1,0 +1,92 @@
+[routes]
+# if url is "" - this means it will not be served. Also you can just not specify url for some route to not serve it.
+top_categories = "/" # URL of page with top categories sorted by ctr
+top_content = "/top" # URL of page with top content sorted by ctr.
+autocomplete = "/autocomplete" # URL of autocomplete api
+search = "/search/{query}" # URL of search page
+popular = "/best" # URL of popular page
+new = "/new" # URL of new content page
+long = "/long" # URL of long content page
+model = "/model/{slug}" # URL of model page, must have {slug} or {id} param
+models = "/model-list" # URL of models page
+category = "/category/{slug}" # URL of category page, must have {slug} or {id} param
+channel = "/channel/{slug}" # URL of channel page, must have {slug} or {id} param
+content_item = "/content/{category}/{slug}" # URL of content item page, must have {slug} or {id} param. Can have {category} param - main category of content, optional
+fake_player = "/player/{slug}" # URL of fake video player, can have {slug} or {id} param
+video_embed = "/embed/{slug}" # URL of video embed for hosted video
+dmca = "/dmca" # dmca report uri
+out = "/c" # URL of out script
+language_template = "/{lang}{route}" #template for language id in route for multilingual sites if multi_language is true
+
+[routes.custom] # custom routes, you must define custom content for this routes with javascript module
+page2257 = "/page2257.html" # custom page for 2257 statement
+ttt = "/ttt/o" # stub trade out for development
+ttt_image = "/ttt/toplist/{hash}${domain}@{size}.jpg" # stub for toplist images
+ttt_tds = "/ttt/tds/{scheme}" # stub for tds schemes
+random = "/random" # custom page with random content
+
+[params] # Query params name override
+content_slug = "slug"
+category_slug = "category"
+model_slug = "model"
+model_id = "model_id"
+channel_slug = "channel"
+channel_id = "channel_id"
+duration_gte = "duration_from"
+duration_lt = "duration_to"
+search_query = "q"
+sort_by = "sort"
+sort_by_views = "views"
+sort_by_views_timeframe = "timeframe"
+sort_by_duration = "duration"
+sort_by_date = "date"
+sort_by_rand = "rand"
+page = "page"
+nocache = "nocache"
+
+# If you will modify below values you must modify them also in default main.ts
+content_id = "id"
+category_id = "cid"
+count_redirect = "r" # param of out script with encoded redirect url
+count_type = "t" # param of out script with type of click counting
+count_type_category = "c" # content on category page click type
+count_type_top_categories = "tca" # category on top categories page click type
+count_type_top_content = "tc" # content on top content page click type
+count_thumb_id = "tid" # thumb id of clicked content link
+count_trade = "tr"  # redirect to trade script
+
+[general]
+trade_url_template = "/ttt/o?url={{encoded_url}}" # trade script url template,
+# can have {{encoded_url}} for url encoded redirect url or {{url}} as raw redirect url
+multi_language = true # if this site is multilingual
+minify_html = false # if yes, html output from template will be minified (makes a little impact on server cpu usage)
+pagination_max_rendered_links = 15 # Maximum rendered page links, default 10
+models_per_page = 20 # Number of models per page on models page
+content_related_amount = 20 # Number of related videos on content item page
+fake_video_page = true # Show fake video page for video links
+disable_categories_redirect = false # if true - redirect to category from top categories page based on referrer will be disabled.
+debug = false
+
+[custom] # Some custom configuration options available in template as config.Custom.your_option
+site_title = "Common site"
+ttt_in_uri = "/ttt/in"
+thumb_rotate_delay = "1500"
+ttt_secret = "some secret"
+ttt_tds_uri = "/ttt/tds"
+
+vast_url = "https://syndication.realsrv.com/splash.php?idzone=4232570"
+cdn_salt = "JsjdIyu872@jkshHHsl;"
+default_video_format = "main" # default format for hosted video.
+default_gallery_format = "main" #default format for picture gallery
+
+[javascript]
+entries = ["main.ts", "video.ts", "video-hosted.ts", "gallery.ts"] # main javascrypt/typescrypt source entry files to build the bundle/bundles
+destination = "" # destination path relative to public path. If empty - destination path = public path.
+minify = true # minify resulting javascript
+
+[scss]
+entries = ["main.scss"] # scss entries to build css
+destination = "" # destination path relative to public. If empty - place result css in public with same name as entry
+images_path = "images" # images resolution from this path relative to scss path
+fonts_path = "fonts" # fonts resolution from this path relative to scss path
+minify = true # minify resulting css

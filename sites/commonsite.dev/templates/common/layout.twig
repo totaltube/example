@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="{{ lang.Id }}" dir="auto">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="google" content="notranslate">
+    <meta name="RATING" content="RTA-5042-1996-1400-1577-RTA">
+    <meta name="referrer" content="unsafe-url">
+    <meta name="theme-color" content="#ffffff">
+    <script defer
+            src="https://polyfill.io/v3/polyfill.min.js?features=IntersectionObserver,Promise,String.prototype.startsWith,String.prototype.includes,document.querySelector,NodeList.prototype.forEach,Array.prototype.forEach,Array.prototype.values,Element.prototype.closest,Element.prototype.classList,Element.prototype.remove,fetch|gated&flags=gated"></script>
+    {% canonical %}
+    {% alternates %}
+    {% prevnext %}
+    <link type="text/css" rel="stylesheet" href="{{ static("main.css") }}">
+    <script>
+        // Dynamic variables for scripts
+        var globals = {
+            autocomplete: '{{ config.Routes.Autocomplete }}',
+            search: '{{ config.Routes.Search }}',
+            model: '{{ config.Routes.Model }}',
+            channel: '{{ config.Routes.Channel }}',
+            category: '{{ config.Routes.Category }}',
+            lang_template: '{{ config.Routes.LanguageTemplate }}',
+            search_param: '{{ config.Params.SearchQuery }}',
+            search_natural_param: '{{ config.Params.SearchNatural }}',
+            multi_language: {{ config.General.MultiLanguage | boolean }},
+            lang: '{{ lang.Id }}',
+            locale: '{{ lang.Locale }}',
+            count: {{ count | boolean }},
+            trade: {% if page_template == "top-categories" %}{{ "false" }}{% else %}true{% endif %},
+            out: '{{ config.Routes.Out }}',
+            dmca: '{{ config.Routes.Dmca }}',
+            captcha_key: '{{ global_config.Frontend.CaptchaKey | safe }}',
+            page_template: '{{ page_template }}',
+            trade_template: '{{ config.General.TradeUrlTemplate }}',
+            thumb_rotate_delay: parseInt('{{ config.Custom.thumb_rotate_delay }}')
+        }
+    </script>
+    {% dynamic insert_ttt() | safe %}
+    <script defer src="{{ static("main.js") }}"></script>
+    {% block head %}
+    {% endblock %}
+</head>
+{# To have proper css rules for rtl languages, writting rtl or ltr as class to body #}
+<body class="{{ lang.Direction }}">
+{% include "theme-detection-script.twig" %}
+{% include "header.twig" %}
+<div class="container body">
+    {% block body %}
+    {% endblock %}
+</div>
+{% include "footer.twig" %}
+<a id="back-to-top" href="#"><i class="icon-chevron-up"></i></a>
+{% include "dialog.twig" %}
+{% block scripts %}
+{% endblock %}
+</body>
+</html>

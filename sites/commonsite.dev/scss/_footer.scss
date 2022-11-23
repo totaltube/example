@@ -1,0 +1,58 @@
+@import "variables";
+
+ul.list {
+  column-count: auto;
+  column-width: 250px;
+  li {
+    white-space: nowrap;
+    line-height: 1.5;
+    overflow: hidden;
+    position: relative;
+    a {
+      text-decoration: none;
+      color: $text-color;
+      border-bottom: 1px dotted $text-color;
+      &:hover {
+        color: $selected-color;
+      }
+    }
+    .total {
+      position: absolute;
+      right: 0;
+      color: darken($selected-color, 5%);
+      .rtl & {
+        right: auto;
+        left: 0;
+      }
+    }
+  }
+}
+
+.list-title {
+  margin-top: 16px;
+  line-height: 2;
+  font-size: 2rem;
+  color: darken($selected-color, 10%);
+}
+.footer {
+  margin-top: 16px;
+  padding: 24px;
+  background-color: $header-background-color;
+  color: $header-text-color;
+}
+.bottom-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-self: end;
+  margin-top: 16px;
+  li {
+    flex-basis: 200px;
+    a {
+      color: $header-text-color;
+      text-decoration: none;
+      &:hover {
+        color: $selected-color;
+      }
+    }
+  }
+}

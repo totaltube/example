@@ -1,0 +1,28 @@
+@import "variables";
+
+.title-filters {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.nav-filter {
+  a {
+    color: $text-color;
+    text-decoration: none;
+  }
+  &:hover {
+    a>i:before {
+      display: inline-block;
+      transform: rotate(90deg);
+    }
+  }
+}
+.filter-list {
+  column-count: auto;
+  column-width: 150px;
+  column-fill: balance;
+  padding: 4px;
+  li {
+    overflow: hidden;
+  }
+}

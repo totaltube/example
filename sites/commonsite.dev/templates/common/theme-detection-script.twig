@@ -1,0 +1,16 @@
+<script>
+    (() => {
+        try {
+            var theme = "light";
+            var storedTheme = localStorage.getItem("theme")
+            if (storedTheme) {
+                if (storedTheme === "dark") theme = "dark"
+            } else if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+                theme = "dark"
+            }
+            if (theme === "dark") document.querySelector("body").classList.add("dark")
+            else document.querySelector("body").classList.remove("dark")
+        } catch (e) {
+        }
+    })();
+</script>

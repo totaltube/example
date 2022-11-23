@@ -1,0 +1,40 @@
+{# Modal DMCA dialog for removing the content #}
+<div class="modal micromodal-slide" id="dmca" aria-hidden="true">
+    <div class="modal__overlay" tabindex="-1" data-micromodal-close>
+        <div class="modal__container" role="dialog" aria-modal="true" aria-labelledby="dmca-title">
+            <form method="post">
+                <div class="modal__header">
+                    <h2 class="modal__title" id="dmca-title">
+                        DMCA Report form
+                    </h2>
+                    <button class="modal__close" aria-label="Close dialog"
+                            data-micromodal-close type="button"></button>
+                </div>
+                <div class="modal__content" id="dmca-content">
+                    <div id="image-holder"></div>
+                    <label for="reason">Reason for content removing</label>
+                    <select name="reason" id="reason">
+                        <option value="copyright">Copyrighted content</option>
+                        <option value="own">Your own video</option>
+                        <option value="legal">Not legal model age</option>
+                        <option value="broken">Broken</option>
+                        <option value="other">Other</option>
+                    </select>
+                    <label for="info">Additional information</label>
+                    <textarea name="info" id="info"></textarea>
+                    <label for="email">Your email address</label>
+                    <input type="email" name="email" value="" id="email">
+                    <input type="hidden" name="content_id" value="">
+                    <div class="captcha-holder"></div>
+                    <div class="success" style="display: none">Successfully sent the request</div>
+                    <div class="error error-captcha" style="display:none;">Error! Please, solve the captcha</div>
+                    <div class="error error-other" style="display:none;"></div>
+                </div>
+                <div class="modal__footer">
+                    <button class="modal__btn modal__btn-primary" type="submit">Submit</button>
+                    <button class="modal__btn" data-micromodal-close aria-label="Close" type="button">Close</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

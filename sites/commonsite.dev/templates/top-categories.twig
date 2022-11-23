@@ -1,0 +1,35 @@
+{% extends "common/layout.twig" %}
+{% block head %}
+    {% set title1 = translate("Best categories") %}
+    {% set title2 = config.Custom.site_title %}
+    {% set title = title1 | add:" - " | add:title2 %}
+    <title>{{ title }}</title>
+    <meta name="description"
+          content="{{ translate("Best available digital content") }}">
+    <meta name="keywords"
+          content="{{ translate("fullhd, free, video, pictures" ) }}">
+{% endblock %}
+{% block body %}
+    {% import "common/show-category.twig" show_category %}
+    {% import "common/show-ad.twig" show_ad %}
+    {% import "common/show-toplist-thumb.twig" show_toplist_thumb %}
+    <main class="thumbs">
+    <!-- ShareThis BEGIN -->
+    <div class="sharethis-inline-share-buttons"></div>
+    <!-- ShareThis END -->
+    {# Top categories are available in variable with name top_categories #}
+    {% set toplist = fetch_toplist("", 8, true) %}
+    {% repeat "ad", amount = 4, as = ads_list %}
+    {% dilute top_categories.Items, ads_list, from = 20, to = 70, as = items %}
+    {% dilute items, toplist.items, from = 10, to = 50, as = items %}
+    {% for item in items %}
+        {% if item == "ad" %}
+            {{ show_ad("native1", forloop.Counter, true) }}
+            {% elif item.trader.domain %}
+            {{ show_toplist_thumb(item, toplist, true) }}
+        {% else %}
+            {{ show_category(item) }}
+        {% endif %}
+    {% endfor %}
+    </main>
+{% endblock %}

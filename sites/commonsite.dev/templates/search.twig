@@ -1,0 +1,44 @@
+{% extends "common/layout.twig" %}
+{% block head %}
+    {% set title1 = search_query %}
+    {% set title2 = config.Custom.site_title %}
+    {% set title = title1 | add:" - " | add:title2 %}
+    <title>{{ title }}</title>
+    <meta name="description"
+          content="{{ search_query | capfirst }}">
+    <meta name="keywords"
+          content="{{ translate("fullhd, free, video, pictures" ) }}, {{ search_query }}">
+{% endblock %}
+{% block body %}
+    {% import "common/show-content.twig" show_content %}
+    {% import "common/show-ad.twig" show_ad %}
+    {% import "common/show-toplist-thumb.twig" show_toplist_thumb %}
+    <div class="title-filters">
+        <h1 class="list-title"><i class="icon-search padded"></i>{{ search_query | capfirst }}</h1>
+        {% include "common/filters.twig" %}
+    </div>
+    {% include "common/pagination.twig" %}
+    {% include "common/related.twig" %}
+    <main class="thumbs">
+        {% set toplist = fetch_toplist("", 8, true) %}
+        {% repeat "ad", amount = 4, as = ads_list %}
+        {% if not content.Items %}
+            {# Showing random content if nothing found by search query #}
+            {% fetch "content", sort = "rand", cache = 600 %}
+                {% dilute fetched_content.Items, ads_list, from = 0, to = 50, as = items %}
+            {% endfetch %}
+        {% else %}
+            {% dilute content.Items, ads_list, from = 0, to = 50, as = items %}
+        {% endif %}
+        {% dilute items, toplist.items, from = 0, to = 30, as = items %}
+        {% for item in items %}
+            {% if item == "ad" %}
+                {{ show_ad("native1", forloop.Counter, false) }}
+            {% elif item.trader.domain %}
+                {{ show_toplist_thumb(item, toplist, false) }}
+            {% else %}
+                {{ show_content(item) }}
+            {% endif %}
+        {% endfor %}
+    </main>
+{% endblock %}

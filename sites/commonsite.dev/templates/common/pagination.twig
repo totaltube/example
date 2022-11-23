@@ -1,0 +1,37 @@
+<h3 class="pagination-showing"><span data-number="{{ from + 1 }}">{{ from + 1 }}</span> -
+    <span data-number="{{ to }}">{{ to }}</span>,
+    <span data-number="{{ total }}">{{ total }}</span>
+    {{ translate("total") }}
+</h3>
+<ul class="pagination">
+    {% for item in pagination() %}
+        {% if item.Type == "prev" %}
+            <li class="{{ item.State }}">
+                {% if item.State == "disabled" %}
+                    <i class="icon-circle-left"></i>
+                {% else %}
+                    <a href="{% page_link item.Page %}"><i class="icon-circle-left"></i></a>
+                {% endif %}
+            </li>
+        {% endif %}
+        {% if item.Type == "next" %}
+            <li{% if item.State != "default" %} class="{{ item.State }}"{% endif %}>
+                {% if item.State == "disabled" %}
+                    <i class="icon-circle-right"></i>
+                {% else %}
+                    <a href="{% page_link item.Page %}"><i class="icon-circle-right"></i></a>
+                {% endif %}
+            </li>
+        {% endif %}
+        {% if item.Type == "ellipsis" %}
+            <li>
+                ...
+            </li>
+        {% endif %}
+        {% if item.Type == "page" %}
+            <li{% if item.State != "default" %} class="{{ item.State }}"{% endif %}>
+                <a href="{% page_link item.Page %}" data-number="{{ item.Page }}">{{ item.Page }}</a>
+            </li>
+        {% endif %}
+    {% endfor %}
+</ul>

@@ -1,0 +1,17 @@
+{% extends "common/layout.twig" %}
+{% block head %}
+    <title>HTTP 404 error</title>
+    <meta name="description" content="HTTP 404 error">
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            window.setTimeout(function(){
+                window.location.href = "/";
+            }, 5000);
+        })
+    </script>
+{% endblock %}
+{% block body %}
+    <main>
+        <h1>{{ translate("404 error. Page not found. You will be redirected to main page automatically.") }}</h1>
+    </main>
+{% endblock %}

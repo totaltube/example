@@ -1,0 +1,60 @@
+@import "variables";
+.pagination-showing {
+    color: lighten($text-color, 10%);
+    opacity: 0.75;
+    font-size: 1rem;
+    font-weight: normal;
+    margin-top: 4px;
+    margin-bottom: 4px;
+}
+.pagination {
+    display: flex;
+    flex-basis: 40px;
+    flex-wrap: wrap;
+    li {
+        //overflow: hidden;
+        font-size: 1.2rem;
+        color: $text-color;
+        line-height: 40px;
+        margin: 2px;
+        &:first-child {
+            margin-left: 0;
+        }
+        &:last-child {
+            margin-right: 0;
+        }
+
+        a, span {
+            color: $text-color;
+            text-decoration: none;
+            display: block;
+            background-color: darken($background-color, 5%);
+            text-align: center;
+            border-radius: 8px;
+            border: 1px solid darken($background-color, 5%);
+            width: 40px;
+            height: 40px;
+            box-sizing: border-box;
+            opacity: 0.7;
+        }
+        a {
+            cursor: pointer;
+        }
+        &.active, &:hover> {
+            a, a:hover, a:focus, span:hover, span:focus {
+                z-index: 3;
+                opacity: 1;
+                font-weight: bold;
+            }
+        }
+        &.disabled> {
+            a, a:hover, a:focus, span:hover, span:focus {
+                opacity: 0.6;
+                cursor: not-allowed;
+            }
+        }
+        &.disabled {
+            display: none;
+        }
+    }
+}

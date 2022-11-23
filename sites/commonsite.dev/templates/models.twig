@@ -1,0 +1,23 @@
+{% extends "common/layout.twig" %}
+{% block head %}
+    {% set title1 = translate("All models") %}
+    {% set title2 = config.Custom.site_title %}
+    {% set title = title1 | add:" - " | add:title2 %}
+    <title>{{ title }}</title>
+    <meta name="description"
+          content="{{ translate("Best available digital content") }}">
+    <meta name="keywords"
+          content="{{ translate("fullhd, free, video, pictures" ) }}">
+{% endblock %}
+{% block body %}
+    {% import "common/show-model.twig" show_model %}
+    {% import "common/show-ad.twig" show_ad %}
+    {% import "common/show-toplist-thumb.twig" show_toplist_thumb %}
+    <h1 class="list-title"><i class="icon-woman padded"></i>{{ translate("All porn stars") }}</h1>
+    {% include "common/pagination.twig" %}
+    <main class="thumbs">
+        {% for item in content.Items %}
+            {{ show_model(item) }}
+        {% endfor %}
+    </main>
+{% endblock %}

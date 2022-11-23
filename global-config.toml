@@ -1,0 +1,21 @@
+[general]
+port = 8380
+real_ip_header = "X-Real-Ip"
+nginx = false # totaltube runs under nginx? In dev mode must be false. In production - true, this way script will avoid
+# double redirection if possible by using X-Accel-Redirect header.
+use_ipv6_network = true
+api_url = "https://totaltube-test-main.totaltraffictrader.com/api/v1/" # With trailing slash
+api_secret = "0KzitIKqVkQ28oFwFYzRjzMiqBiKAqRI9U8X57oL"
+api_timeout = "30 seconds"
+
+[frontend]
+sites_path = "./sites"
+default_site = "commonsite.dev"
+secret_key = "Some secret passthrase - change it to your own"
+captcha_key = "6LeRDuUhAAAAAK2zqU48jb7db3WXhZBAzcBr2y7Q" # For DMCA
+captcha_secret = "6LeRDuUhAAAAAAsGTo_lq94vadcfclA8l5AEy-Do" # For DMCA
+max_dmca_minute = 5 # All other DMCA's from this IP will be captcha powered.
+captcha_whitelist = ["to@sersh.com"] # Whitelist of emails which doesn't need to be captcha checked.
+
+[database]
+path = "./database"

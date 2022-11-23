@@ -1,0 +1,23 @@
+{% macro show_toplist_thumb(item, toplist, isCategory) export %}
+    <div class="thumb">
+        <figure>
+            <a href="{% link "ttt", perm = item.trader.domain %}" data-new="true">
+                <picture>
+                    <source srcset="{{ toplist.toplist_uri }}/{{ toplist.hash }}${{ item.trader.domain }}@340x192.jpg, {{ toplist.toplist_uri }}/{{ toplist.hash }}${{ item.trader.domain}}@510x288.jpg 1.5x">
+                    <img
+                            alt="{{ item.trader.name }}"
+                            src="{{ toplist.toplist_uri }}/{{ toplist.hash }}${{ item.trader.domain }}@340x192.jpg"
+                            loading="lazy"
+                    >
+                </picture>
+            </a>
+            <figcaption>
+                {% if isCategory %}
+                    <div class="title-niche">{{ item.trader.name }} <span style="color: #660303">AD</span></div>
+                {% else %}
+                    <div class="title">{{ item.trader.name }} <span style="color: #660303">AD</span></div>
+                {% endif %}
+            </figcaption>
+        </figure>
+    </div>
+{% endmacro %}

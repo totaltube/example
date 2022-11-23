@@ -1,0 +1,96 @@
+<div style="display: flex; flex-wrap: wrap">
+    {% if page_template != "new" and page_template != "popular" and page_template != "long" %}
+    <div class="dropdown nav-filter" style="margin-right: 16px">
+        <a href="#">
+            <i class="icon-chevron-right"></i>
+            {% if not query.sort_by %}
+                {{ translate("Sort by popularity") | capfirst }}
+                {% elif query.sort_by == "dated" %}
+                {{ translate("Sort by date") | capfirst }}
+                {% elif query.sort_by == "duration" %}
+                {{ translate("Sort by duration") | capfirst }}
+            {% else %}
+                {{ translate("Sort by") | capfirst }}
+            {% endif %}
+        </a>
+        <div class="dropdown-content" style="right: 0; width: 100vw; max-width: 350px;">
+            <ul>
+                <li {% if not query.sort_by %} class="selected"{% endif %}>
+                    <a href="{% link "current", sort_by = "" %}">{{ translate("Sort by popularity") | capfirst }}</a>
+                </li>
+                <li {% if query.sort_by == "dated" %} class="selected"{% endif %}>
+                    <a href="{% link "current", sort_by = "dated" %}">{{ translate("Sort by date") | capfirst }}</a>
+                </li>
+                <li {% if query.sort_by == "duration" %} class="selected"{% endif %}>
+                    <a href="{% link "current", sort_by = "duration" %}">{{ translate("Sort by duration") | capfirst }}</a>
+                </li>
+            </ul>
+        </div>
+    </div>
+    {% endif %}
+    <div class="dropdown nav-filter" style="margin-right: 16px">
+        <a href="#">
+            <i class="icon-chevron-right"></i>
+            {% if not query.duration_gte and query.duration_lt == "300" %}
+                {{ translate("< 5 minutes") }}
+                {% elif query.duration_lt == "600" %}
+                {{ translate("5 - 10 minutes") }}
+                {% elif query.duration_lt == "1200" %}
+                {{ translate("10 - 20 minutes") }}
+                {% elif query.duration_gte == "1200" %}
+                {{ translate("> 20 minutes") }}
+            {% else %}
+                {{ translate("Duration") | capfirst }}
+            {% endif %}
+        </a>
+        <div class="dropdown-content" style="right: 0; width: 100vw; max-width: 350px;">
+            <ul>
+                {% if query.duration_gte or query.duration_lt %}
+                    <li>
+                        <a href="{% link "current", duration_gte = "", duration_lt = "" %}">{{ translate("Reset") }}</a>
+                    </li>
+                {% endif %}
+                <li {% if not query.duration_gte and duration_lt == "300" %} class="selected"{% endif %}>
+                    <a href="{% link "current", duration_gte = "", duration_lt = "300" %}">{{ translate("< 5 minutes") }}</a>
+                </li>
+                <li {% if query.duration_lt == "600" %} class="selected"{% endif %}>
+                    <a href="{% link "current", duration_gte = "300", duration_lt = "600" %}">{{ translate("5 - 10 minutes") }}</a>
+                </li>
+                <li {% if query.duration_lt == "1200" %} class="selected"{% endif %}>
+                    <a href="{% link "current", duration_gte = "600", duration_lt = "1200" %}">{{ translate("10 - 20 minutes") }}</a>
+                </li>
+                <li {% if query.duration_gte == "1200" %} class="selected"{% endif %}>
+                    <a href="{% link "current", duration_gte = "1200", duration_lt = "" %}">{{ translate("> 20 minutes") }}</a>
+                </li>
+            </ul>
+        </div>
+    </div>
+    {% if page_template != "channel" %}
+    <div class="dropdown nav-filter">
+        {% fetch "channels", amount = 100, page = 1, sort = "popular", cache = 300 %}
+        {% sort channels.Items, type = "title" %}
+            <a href="#">
+                <i class="icon-chevron-right"></i>
+                {% for item in channels.Items %}
+                    {% if item.Slug == query.channel_slug %}
+                        {% set channel_ok = true %}
+                        {{ item.Title | capfirst }}
+                    {% endif %}
+                {% endfor %}
+                {% if not channel_ok %}
+                    {{ translate("Channel") | capfirst }}
+                {% endif %}
+            </a>
+            <div class="dropdown-content" style="right: 0; width: 94vw; max-width: 600px;">
+                <ul class="filter-list">
+                    {% for item in channels.Items %}
+                        <li {% if query.channel_slug == item.Slug %} class="selected"{% endif %}>
+                            <a href="{% link "current", channel_slug = item.Slug %}">{{ item.Title | capfirst }}</a>
+                        </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        {% endfetch %}
+    </div>
+    {% endif %}
+</div>

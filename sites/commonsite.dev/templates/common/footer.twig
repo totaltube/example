@@ -1,0 +1,104 @@
+<footer>
+    <div class="container body">
+        {% block listings %}
+            {# Listing most popular categories #}
+            {% fetch "categories", amount = 200, page = 1, sort = "popular", cache = 300 %}
+                {# inside this tag they will be available with variable name categories #}
+                {# And sort categories by title #}
+            {% sort categories.Items, type = "title" %}
+                <h3 class="list-title"><i class="icon-list padded"></i>{{ translate('Popular categories list') }}
+                </h3>
+                <ul class="list">
+                    {% for item in categories.Items %}
+                        <li>
+                            <a href="{% link "category", slug = item.Slug %}">{{ item.Title | capfirst }}</a>
+                            <span class="total" data-number="{{ item.Total }}">{{ item.Total }}</span>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% endfetch %}
+            {# Listing most popular models #}
+            {% fetch "models", amount = 200, page = 1, sort = "popular", cache = 300 %}
+                {# inside this tag they will be available with variable name models #}
+                {# And sort models by title #}
+            {% sort models.Items, type = "title" %}
+                <h3 class="list-title"><i class="icon-woman padded"></i>{{ translate('Popular porn stars list') }}
+                </h3>
+                <ul class="list">
+                    {% for item in models.Items %}
+                        <li>
+                            <a href="{% link "model", slug = item.Slug %}">{{ item.Title | capfirst }}</a>
+                            <span class="total" data-number="{{ item.Total }}">{{ item.Total }}</span>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% endfetch %}
+
+            {# Listing most popular channels #}
+            {% fetch "channels", amount = 100, page = 1, sort = "popular", cache = 300 %}
+                {# inside this tag they will be available with variable name channels #}
+                {# And sort channels by title #}
+            {% sort channels.Items, type = "title" %}
+                <h3 class="list-title"><i class="icon-rss padded"></i>{{ translate('Popular channels list') }}</h3>
+                <ul class="list">
+                    {% for item in channels.Items %}
+                        <li>
+                            <a href="{% link "channel", slug = item.Slug, id = item.Id %}">{{ item.Title | capfirst }}</a>
+                            <span class="total" data-number="{{ item.Total }}">{{ item.Total }}</span>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% endfetch %}
+
+            {# Listing most popular searches #}
+            {% fetch "searches", amount = 40, page = 1, sort = "rand", cache = 300, min_searches = 1 %}
+                {# inside this tag they will be available with variable name searches #}
+                <h3 class="list-title"><i class="icon-search padded"></i>{{ translate('Trends') }}</h3>
+                <ul class="list">
+                    {% for item in searches %}
+                        <li>
+                            <a href="{% link "search", query = item.Message %}">{{ item.Message | capfirst }}</a>
+                            <span class="total" data-number="{{ item.Searches }}">{{ item.Searches }}</span>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% endfetch %}
+            {# Listing toplist #}
+            {# Fetching ttt toplist #}
+            {% set toplist = fetch_toplist("", 40) %}
+            <h3 class="list-title"><i class="icon-fire padded"></i>{{ translate("Best sites") | capfirst }}</h3>
+            <ul class="list">
+                {% for item in toplist.items %}
+                    <li>
+                        <a href="{{ item.trader.url }}" target="_blank" rel="noopener">{{ item.trader.name }}</a>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% endblock %}
+    </div>
+    <div class="footer">
+        <div class="container" style="display: flex; flex-wrap: wrap">
+            <!-- ShareThis BEGIN -->
+            <div class="sharethis-inline-share-buttons"></div>
+            <!-- ShareThis END -->
+            <div style="flex-basis: 400px; flex-grow: 1; display: flex; flex-direction: column; justify-content: space-between">
+                <div>
+                    {{ translate("Disclaimer: we have no tolerance to illegal pornography. all videos are provided by other sites. we have no control over the content of these pages. we will remove links to copyrighted or illegal content within several hours. just report problematic videos using ⚑ button near video thumb. if you do not agree with our terms, please leave this site") }}
+                </div>
+                <ul class="bottom-links">
+                    <li><a href="#" class="dmca-link">Remove content</a></li>
+                    <li><a href="https://totaltraffictrader.com" target="_blank" rel="nofollow">Trade traffic</a></li>
+                    <li><a href="/page2257.html">18 U.S.C. 2257</a></li>
+                </ul>
+            </div>
+            <div style="flex-basis: 300px; flex-grow: 0; margin-left: 16px">
+                <nav class="logo">
+                    <a href="{% link "top_categories" %}" title="{{ mainTitle | capfirst }}">
+                        <img src="{{ static("img/logo.png") }}" width="228" height="50" alt="{{ mainTitle | capfirst }}">
+                    </a>
+                </nav>
+                <div style="text-align: right"> &copy; {{ host }}, {{ now.Year() }}</div>
+            </div>
+        </div>
+    </div>
+</footer>

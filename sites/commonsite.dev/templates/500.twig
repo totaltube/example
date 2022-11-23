@@ -1,0 +1,15 @@
+{% extends "common/layout.twig" %}
+{% block head %}
+    <title>HTTP 500 error</title>
+    <meta name="description" content="HTTP 500 error">
+{% endblock %}
+{% block body %}
+    <main>
+        <h1>{{ translate("Server error. Please, try to come back later.") }}</h1>
+        <div style="font-size: 1.5rem; margin-top: 30px">
+        <code>
+            {{ error }}
+        </code>
+        </div>
+    </main>
+{% endblock %}

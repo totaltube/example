@@ -1,0 +1,46 @@
+@import "variables";
+/* The container <div> - needed to position the dropdown content */
+.dropdown {
+  position: relative;
+  display: inline-block;
+  @media only screen and (max-width: 600px) {
+    position: static;
+  }
+}
+
+/* Dropdown Content (Hidden by Default) */
+.dropdown-content {
+  display: none;
+  position: absolute;
+  background-color: $dropdown-background-color;
+  min-width: 200px;
+  @media only screen and (max-width: 600px) {
+    width: 100%;
+  }
+  box-shadow: 0px 8px 16px 0px rgba(0, 0, 0, 0.2);
+  z-index: 95000;
+}
+
+/* Links inside the dropdown */
+.dropdown-content {
+  a {
+    color: black !important;
+    padding: 12px 16px;
+    text-decoration: none;
+    display: block;
+  }
+  li {
+    &:hover {
+      /* Change color of dropdown links on hover */
+      background-color: darken($dropdown-background-color, 5%);
+    }
+    &.selected {
+      font-weight: bold;
+    }
+  }
+}
+
+/* Show the dropdown menu on hover */
+.dropdown:hover .dropdown-content {
+  display: block;
+}

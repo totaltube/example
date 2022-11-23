@@ -1,0 +1,49 @@
+{% macro show_content(item) export %}
+    <div class="thumb">
+        <figure>
+            <a href="{% link "content", slug = item.Slug, id = item.Id, categories = item.Categories, category = category.Slug %}"
+               rel="noopener"
+               data-id="{{ item.Id }}"
+               data-category-id="{{ category.Id }}"
+               data-thumb-id="{{ item.SelectedThumb() }}"
+               class="thumb-link"
+               data-target="_blank">
+                <picture
+                        data-thumb-number="{{ item.SelectedThumb() }}"
+                        data-amount="{{ item.ThumbsAmount }}"
+                        data-retina="{{ item.ThumbRetina }}"
+                >
+                    <source srcset="{{ item.Thumb() }}{% if item.ThumbRetina %}, {{ item.HiresThumb() }} 1.5x{% endif %}">
+                    <img
+                            alt="{{ item.Title | title }}"
+                            src="{{ item.Thumb() }}"
+                            loading="lazy"
+                    >
+                </picture>
+                <div class="duration"><i class="icon-hour-glass"></i> {{ item.Duration.Format() }}</div>
+                <div class="channel"><i class="icon-rss"></i> {{ item.Channel.Title }}</div>
+                <div class="dated"><i class="icon-clock"></i> {{ time_ago(item.Dated) }}</div>
+                <div class="flag dmca-link"><i class="icon-flag"></i></div>
+            </a>
+            <figcaption>
+                <div class="title">
+                    <a href="{% link "content", slug = item.Slug, id = item.Id, categories = item.Categories, category = category.Slug %}"
+                       rel="noopener"
+                       data-id="{{ item.Id }}"
+                       data-category-id="{{ category.Id }}"
+                       data-thumb-id="{{ item.SelectedThumb() }}"
+                       class="thumb-link"
+                       data-target="_blank">
+                    {% if item.TitleTranslated %}
+                        {{ item.Title | capfirst }}
+                        {% elif item.Keywords %}
+                        {{ item.Keywords | max:4 | join:", " | capfirst }}
+                    {% else %}
+                        {{ item.Title | capfirst }}
+                    {% endif %}
+                    </a>
+                </div>
+            </figcaption>
+        </figure>
+    </div>
+{% endmacro %}

@@ -1,0 +1,16 @@
+<ul class="related">
+    <li class="related-text">{{ translate("Related to") | capfirst }}</li>
+    {% for related in content.Related %}
+        <li>
+            {% if related.Type == "category" %}
+                <a href="{% link "category", slug = related.Slug, id = related.Id %}">{{ related.Message }}</a>
+            {% elif related.Type == "model" %}
+                <a href="{% link "model", slug = related.Slug, id = related.Id %}">{{ related.Message }}</a>
+            {% elif related.Type == "channel" %}
+                <a href="{% link "channel", slug = related.Slug, id = related.Id %}">{{ related.Message }}</a>
+            {% else %}
+                <a href="{% link "search", query = related.Message %}">{{ related.Message }}</a>
+            {% endif %}
+        </li>
+    {% endfor %}
+</ul>

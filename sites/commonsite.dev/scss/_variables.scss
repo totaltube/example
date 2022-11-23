@@ -1,0 +1,44 @@
+// config
+
+$multiLang: true; // generate styles for multi language site
+
+// Добавляет тень и округляет низ
+@mixin dropdown() {
+  box-shadow: 7px 7px 6px 0 rgba(15, 14, 15, 0.43);
+  border-bottom-left-radius: 4px;
+  border-bottom-right-radius: 4px;
+  z-index: 20;
+}
+
+// Main
+$text-color: #1f1c19;
+$background-color: #AEA69C;
+$selected-color: #2c2927;
+
+$font-family: Helvetica, Verdana, Arial, sans-serif;
+$font-size: 14px;
+$font-size-smaller: 12px;
+$font-size-bigger: 16px;
+$h1_color: #e2cec1;
+
+// Header
+$header-background-color: #D5CCBF;
+$header-text-color: #1f1a1a;
+
+// Related links
+
+$related-link-color: $text-color;
+$related-background-color: $background-color;
+
+// Dropdown
+$dropdown-background-color: lighten($background-color, 20%);
+$dropdown-selected-color: $selected-color;
+
+// List
+$list-background-color: lighten($background-color, 5%);
+//$list-background: $list-background-color svg-uri('<svg width="30" height="30" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg"><path d="M20 20.5V18H0v-2h20v-2H0v-2h20v-2H0V8h20V6H0V4h20V2H0V0h22v20h2V0h2v20h2V0h2v20h2V0h2v20h2V0h2v20h2v2H20v-1.5zM0 20h2v20H0V20zm4 0h2v20H4V20zm4 0h2v20H8V20zm4 0h2v20h-2V20zm4 0h2v20h-2V20zm4 4h20v2H20v-2zm0 4h20v2H20v-2zm0 4h20v2H20v-2zm0 4h20v2H20v-2z" fill="#{darken($list-background-color, 4%)}" fill-opacity=".4" fill-rule="evenodd"/></svg>');
+
+// Video
+$video-background-color: $list-background-color;
+//$video-background: $list-background;
+$video-text-color: $text-color;

@@ -1,0 +1,39 @@
+<title>{{ title }}</title>
+<meta name="description"
+      content="{{ description }}">
+<meta name="keywords"
+      content="porn movies,porn videos,{% for r in content.Related %}{{ r.Message }},{% endfor %},free tube,hot porn">
+<meta property="og:title" content="{{ content_item.Title | capfirst }}">
+<meta property="og:url" content="https://{{ host }}{% link "current" %}">
+<meta property="og:type" content="video.movie"/>
+<meta property="og:video" content="https://vcdn.{{ host }}/embed/{{ embed_slug(content_item.Content) }}">
+<meta property="og:video:url" content="{{ videoInfo.urls.0.url }}">
+<meta property="og:video:type" content="video/mp4">
+{% if content_item.Type == "video-embed" %}
+    {% set iframe = parse_iframe(content_item.Content) %}
+    <meta property="og:video:width" content="{{ iframe.Width }}">
+    <meta property="og:video:height" content="{{ iframe.Height }}">
+{% endif %}
+{% if content_item.Type == "video" %}
+    <meta property="og:video:width" content="{{ content_item.VideoSize(config.Custom.default_video_format).Width }}">
+    <meta property="og:video:height" content="{{ content_item.VideoSize(config.Custom.default_video_format).Height }}">
+{% endif %}
+<meta property="og:description" content="{{ description }}">
+{% if content_item.Duration > 0 %}
+    <meta property="video:duration" content="{{ content_item.Duration }}">
+{% endif %}
+<meta property="ya:ovs:upload_date" content="{{ time8601(content_item.Dated) }}">
+<meta property="video:tag" content="{{ tags | join:", " }}">
+<meta property="og:image" content="{{ content_item.HiresThumb() }}">
+<script type="application/ld+json">
+        {
+            "@context": "http://schema.org",
+            "@type": "VideoObject",
+            "uploadDate": "{{ time8601(content_item.Dated) }}",
+            "name": "{{ content_item.Title | capfirst }}",
+            "description": "{{ description }}",
+            "thumbnailUrl": "{{ content_item.HiresThumb() }}",
+            "duration": "{{ duration8601(content_item.Duration) }}",
+            "embedUrl": "https://vcdn.{{ host }}/embed/{{ embed_slug(content_item.Content) }}"
+        }
+    </script>

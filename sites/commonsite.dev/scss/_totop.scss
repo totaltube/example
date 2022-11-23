@@ -1,0 +1,13 @@
+@import "lib/svg-uri";
+#totop {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: none;
+  background: lighten($background-color, 30%) svg-uri('<svg xmlns="http://www.w3.org/2000/svg" fill="#3E2723" width="48" height="48" viewBox="0 0 48 48"><path d="M14.83 30.83L24 21.66l9.17 9.17L36 28 24 16 12 28z"/></svg>');
+  opacity: 0.7;
+  position: fixed; /* Fixed/sticky position */
+  bottom: 15px; /* Place the button at the bottom of the page */
+  right: 15px; /* Place the button 30px from the right */
+  z-index: 99; /* Make sure it does not overlap */
+}

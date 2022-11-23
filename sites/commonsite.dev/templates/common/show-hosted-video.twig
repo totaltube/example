@@ -1,0 +1,16 @@
+{% macro show_hosted_video(content_item) export %}
+    <div class="video">
+        {% set poster = content_item.VideoPoster(config.Custom.default_video_format) %}
+        {% set timeline = content_item.VideoTimeline(config.Custom.default_video_format) %}
+        <video playsinline controls crossorigin="anonymous"
+               {% if poster %}data-poster="{{ poster }}"{% endif %}
+                {% if timeline %}data-timeline="{{ timeline }}"{% endif %}
+               data-vast="{{ config.Custom.vast_url }}"
+        >
+            {% for format in content_item.VideoFormats() %}
+                <source src="{{ video_cdn(content_item.VideoUrl(format)) }}"
+                        type="video/{{ content_item.VideoInfo(format).Type }}">
+            {% endfor %}
+        </video>
+    </div>
+{% endmacro %}

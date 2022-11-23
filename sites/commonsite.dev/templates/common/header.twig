@@ -1,0 +1,70 @@
+{% set mainTitle = "Common site" %}
+{% set popularTitle = translate("Popular") %}
+{% set newTitle = translate("New") %}
+{% set longTitle = translate("Long") %}
+{% set pornstarsTitle = translate("Models") %}
+{% set searchText = translate("Search") %}
+
+<div class="header">
+    <div class="container">
+        <nav class="sorted-links" role="navigation">
+            <ul>
+                {% if config.General.MultiLanguage %}
+                    <li class="lang-link">
+                        <div class="language-select-btn">
+                            <div class="dropdown">
+                                <a href="#" class="nav-flag">
+                                    <i class="icon-chevron-right"></i>
+                                    <img src="{{ static('flags/', lang.Country, '.png') }}"><span>{{ lang.Native | capfirst }}</span>
+                                </a>
+                                <div class="dropdown-content" style="right: 0;">
+                                    <ul class="language-select">
+                                        {% for lang in languages %}
+                                            <li>
+                                                <a hreflang="{{ lang.Id }}" href="{% alternate lang.Id %}"
+                                                   data-lang="{{ lang.Id }}">
+                                                    <img src="{{ static("flags/", lang.Country, ".png") }}"
+                                                         loading="lazy">
+                                                    {{ lang.Native | capfirst }}
+                                                </a>
+                                            </li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </li>
+                {% endif %}
+                <li>
+                    <a href="{% link "popular" %}">{{ popularTitle | capfirst }}</a>
+                </li>
+                <li>
+                    <a href="{% link "new" %}">{{ newTitle }}</a>
+                </li>
+                <li>
+                    <a href="{% link "long" %}">{{ longTitle }}</a>
+                </li>
+                <li>
+                    <a href="{% link "models" %}">{{ pornstarsTitle }}</a>
+                </li>
+            </ul>
+        </nav>
+        <div style="clear: both"></div>
+        <div class="header-line-2">
+            <nav class="logo">
+                <a href="{% link "top_categories" %}" title="{{ mainTitle | capfirst }}">
+                    <img src="{{ static("img/logo.png") }}" width="228" height="50" alt="{{ mainTitle | capfirst }}">
+                    {# <span class="one">Sex</span><span class="two">HD</span><span class="three">for</span><span class="four">me</span> #}
+                </a>
+            </nav>
+            <div class="search-box">
+                <form method="get" id="search-form">
+                    <input type="search" name="q" value="" placeholder="{{ searchText }}" autocomplete="off">
+                    <input type="hidden" name="{{ config.Params.SearchNatural }}" value="1">
+                    <button type="submit"><i class="icon-search"></i></button>
+                </form>
+            </div>
+        </div>
+        <div style="clear: both"></div>
+    </div>
+</div>

@@ -1,0 +1,25 @@
+@import "variables";
+
+.related {
+  display: flex;
+  flex-wrap: wrap;
+
+  li:not(.related-text) {
+    margin: 4px;
+    padding: 4px;
+  }
+  .related-text {
+    margin: 4px;
+    padding: 4px;
+    font-size: 1.1rem;
+  }
+  a {
+    font-size: 1.1rem;
+    text-decoration: none;
+    color: $text-color;
+    border-bottom: 1px dotted $text-color;
+    &:hover {
+      color: lighten($text-color, 10%);
+    }
+  }
+}

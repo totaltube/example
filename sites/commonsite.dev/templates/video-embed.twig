@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="{{ lang.Id }}">
+<head>
+    <title>{{ translate_title(content_item.Title) }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script defer
+            src="https://polyfill.io/v3/polyfill.min.js?features=IntersectionObserver,Promise,String.prototype.startsWith,String.prototype.includes,document.querySelector,NodeList.prototype.forEach,Array.prototype.forEach,Array.prototype.values,Element.prototype.closest,Element.prototype.classList,Element.prototype.remove,fetch|gated&flags=gated"></script>
+    {% canonical %}
+    {% alternates %}
+    <link type="text/css" rel="stylesheet" href="{{ static("video-hosted.css") }}">
+    <script src="{{ static("video-hosted.js") }}"></script>
+</head>
+<body>
+{% import "common/show-hosted-video.twig" show_hosted_video %}
+{{ show_hosted_video(content_item) }}
+</body>
+</html>

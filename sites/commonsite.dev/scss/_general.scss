@@ -1,0 +1,78 @@
+@import "variables";
+
+html {
+  line-height: 1.15;
+  -ms-text-size-adjust: 100%;
+  -webkit-text-size-adjust: 100%;
+  font-size: $font-size;
+  font-family: $font-family;
+}
+article,
+aside,
+footer,
+header,
+nav,
+section {
+  display: block;
+}
+ul {
+  list-style-type: none;
+}
+* {
+  margin: 0;
+  padding: 0;
+  outline: none;
+}
+
+button {
+  cursor: pointer;
+}
+
+.container {
+  width: 98%;
+  margin: 0 auto;
+  max-width: 1550px;
+  box-sizing: border-box;
+  position: relative;
+}
+body {
+  background-color: $background-color;
+  color: $text-color;
+}
+@media (prefers-color-scheme: dark) {
+  body {
+
+  }
+}
+// Make all transitions smooth
+* {
+  transition: all 0.1s ease;
+}
+
+// back to top button
+#back-to-top {
+  z-index: 1000;
+  font-size: 24px;
+  text-decoration: none;
+  color: $text-color;
+  background-color: darken($background-color, 10%);
+  padding: 12px;
+  border-radius: 30%;
+  opacity: 0.5;
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  border: none;
+  outline: none;
+  display: none;
+}
+
+.red { // for ADs
+  color: #660303;
+}
+
+// sharethis
+.sharethis-inline-share-buttons {
+  margin: 16px 0;
+  width: 100%;
+}

@@ -1,0 +1,17 @@
+{% macro show_ad(zone, pos, isCategory) export %}
+    <div class="thumb">
+        <figure>
+            <div class="a-holder">
+                <iframe src="{{ config.Custom.ttt_tds_uri }}/{{ zone }}?pos={{ pos }}&host={{ host }}"
+                        frameborder="0" scrolling="no" marginheight="0" marginwidth="0" style="margin: 0;padding: 0; border: 0; overflow: hidden"></iframe>
+            </div>
+            <figcaption>
+                {% if isCategory %}
+                    <div class="title-niche">Greatest Offer <span class="red">AD</span></div>
+                {% else %}
+                    <div class="title">Greatest Offer <span class="red">AD</span></div>
+                {% endif %}
+            </figcaption>
+        </figure>
+    </div>
+{% endmacro %}

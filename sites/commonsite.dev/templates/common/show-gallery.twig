@@ -1,0 +1,11 @@
+{% macro show_gallery(content_item) export %}
+    <div id="lightgallery">
+        {% set images = content_item.GalleryImages(config.Custom.default_gallery_format) %}
+        {% for image in images %}
+            <a href="{{ image.ImageUrl }}" data-lg-size="{{ image.ImageSize.Width }}-{{ image.ImageSize.Height }}">
+                <img src="{{ image.PreviewUrl }}" width="{{ image.PreviewSize.Width }}"
+                     height="{{ image.PreviewHeight.Height }}" alt="{{ translate_title(content_item.Title) }}">
+            </a>
+        {% endfor %}
+    </div>
+{% endmacro %}
