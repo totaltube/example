@@ -10,10 +10,10 @@
                data-target="_blank">
                 <picture
                         data-thumb-number="{{ item.SelectedThumb() }}"
-                        data-amount="{{ item.ThumbsAmount }}"
-                        data-retina="{{ item.ThumbRetina }}"
+                        data-amount="{{ item.GetThumbFormat().ThumbsAmount }}"
+                        data-retina="{{ item.GetThumbFormat().Retina }}"
                 >
-                    <source srcset="{{ item.Thumb() }}{% if item.ThumbRetina %}, {{ item.HiresThumb() }} 1.5x{% endif %}">
+                    <source srcset="{{ item.Thumb() }}{% if item.GetThumbFormat().Retina %}, {{ item.HiresThumb() }} 1.5x{% endif %}">
                     <img
                             alt="{{ item.Title | title }}"
                             src="{{ item.Thumb() }}"
