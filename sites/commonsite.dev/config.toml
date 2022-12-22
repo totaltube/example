@@ -56,6 +56,9 @@ count_thumb_id = "tid" # thumb id of clicked content link
 count_trade = "tr"  # redirect to trade script
 
 [general]
+canonical_url = "" # canonical root url for the site. If not set, hostname of requested site will be used on https proto.
+                   # If your site has several domains, better set canonical url here.
+
 trade_url_template = "/ttt/o?url={{encoded_url}}" # trade script url template,
 # can have {{encoded_url}} for url encoded redirect url or {{url}} as raw redirect url
 multi_language = true # if this site is multilingual
