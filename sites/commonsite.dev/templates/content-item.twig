@@ -1,146 +1,118 @@
 {% extends "common/layout.twig" %}
 {% block head %}
-    {% set tags = content_item.Tags | max:15 %}
-    {# Setting title #}
-    {% set title1 = content_item.Title | capfirst %}
-    {% set title2 = translate_title(title1) %}
-    {% set title = title2 | add:" - " | add:config.Custom.site_title | capfirst %}
-    {# Setting description #}
-    {% set description1 = "Watch and download free video of " | add:content_item.Title %}
-    {% set description = translate_description(description1) | capfirst %}
-    {% include "common/video-head.twig" %}
-    <title>{{ title }}</title>
-    <meta name="description"
-          content="{{ title }} {{ translate("best videos") }}">
-    {% set tags = content_item.Tags | join:", " %}
-    <meta name="keywords" content="{{ tags }}">
-    <meta property="og:title" content="{{ title }}">
-    <meta property="og:url" content="https://{{ host }}{% link "current" %}">
-    <meta property="og:type" content="video.movie"/>
-    <meta property="og:video" content="https://{{ host }}{% link "current" %}">
-    <meta property="og:description" content="{{ title }}">
-    {% if content_item.Duration > 0 %}
-        <meta property="video:duration" content="{{ content_item.Duration }}">
-    {% endif %}
-    <meta property="ya:ovs:adult" content="true">
-    {% if content_item.Type == "video" %}
-        <meta property="ya:ovs:upload_date" content="{{ time8601(content_item.Dated) }}">
-        <link type="text/css" rel="stylesheet" href="{{ static("video-hosted.css") }}">
-        <script src="{{ static("video-hosted.js") }}"></script>
-    {% endif %}
-    <meta property="og:image" content="{{ content_item.HiresThumb() }}">
-    {% if content_item.Type == "video-embed" or content_item.Type == "video-link" %}
-    <script defer src="{{ static("video.js") }}"></script>
-    {% endif %}
-    {% if content_item.Type == "gallery" %}
-        <link type="text/css" rel="stylesheet" href="{{ static("gallery.css") }}">
-        <script defer src="{{ static("gallery.js") }}"></script>
-    {% endif %}
+	{% set tags = content_item.Tags | max:15 %}
+	{# Setting title #}
+	{% set title1 = content_item.Title | capfirst %}
+	{% set title2 = translate_title(title1) %}
+	{% set title = title2 | add:" - " | add:config.Custom.site_title | capfirst %}
+	{# Setting description #}
+	{% set description1 = "Watch and download free video of " | add:content_item.Title %}
+	{% set description = translate_description(description1) | capfirst %}
+	{% include "common/video-head.twig" %}
+	<title>{{ title }}</title>
+	<meta name="description" content="{{ title }} {{ translate("best videos") }}">
+	{% set tags = content_item.Tags | join:", " %}
+	<meta name="keywords" content="{{ tags }}">
+	<meta property="og:title" content="{{ title }}">
+	<meta property="og:url" content="https://{{ host }}{% link "current" %}">
+	<meta property="og:type" content="video.movie"/>
+	<meta property="og:video" content="https://{{ host }}{% link "current" %}">
+	<meta property="og:description" content="{{ title }}">
+	{% if content_item.Duration > 0 %}
+		<meta property="video:duration" content="{{ content_item.Duration }}">
+	{% endif %}
+	<meta property="ya:ovs:adult" content="true">
+	{% if content_item.Type == "video" %}
+		<meta property="ya:ovs:upload_date" content="{{ time8601(content_item.Dated) }}">
+		<link type="text/css" rel="stylesheet" href="{{ static("video-hosted.css") }}">
+		<script src="{{ static("video-hosted.js") }}"></script>
+	{% endif %}
+	<meta property="og:image" content="{{ content_item.HiresThumb() }}">
+	{% if content_item.Type == "video-embed" or content_item.Type == "video-link" %}
+		<script defer src="{{ static("video.js") }}"></script>
+	{% endif %}
+	{% if content_item.Type == "gallery" %}
+		<link type="text/css" rel="stylesheet" href="{{ static("gallery.css") }}">
+		<script defer src="{{ static("gallery.js") }}"></script>
+	{% endif %}
 {% endblock %}
 {% block body %}
-    {% import "common/show-content.twig" show_content %}
-    <div class="video-wrapper">
-        <h1 class="list-title"><i class="icon-camera padded"></i>{{ title }}</h1>
-    {% if content_item.Type == "video-link" %}
-        <div class="video-holder">
-            <div class="video" data-id="{{ content_item.Id }}" data-type="{{ content_item.Type }}"
-                 data-splash-url="{{ config.Custom.ttt_tds_uri }}/splash" data-under-url="{{ config.Custom.ttt_tds_uri}}/pplink"
-                 style="--aspect-ratio: {{ content_item.ThumbsHeight }} / {{ content_item.ThumbsWidth }}">
-                <iframe
-                        src="{% link "fake_player", slug = content_item.Slug, id = content_item.Id %}"
-                        allowfullscreen
-                        style="margin:0; padding: 0; border: 0"
-                        frameborder="0"
-                        marginheight="0"
-                        marginwidth="0"
-                        width="{{ content_item.ThumbsWidth }}"
-                        height="{{ content_item.ThumbsHeight }}" class="responsive">
-                </iframe>
-                <div class="insert" style="display: none">
-                    <div class="close"><a
-                                href="{% if content_item.Type == "video-link" %}{% link content_item.Link, with_trade = true %}{% else %}{% alternate lang.Id %}{% endif %}"
-                                rel="noopener nofollow"
-                        ><i
-                                    class="icon-cross"></i></a></div>
-                    <div class="a">
-                        <iframe
-                                src="{{ config.Custom.ttt_tds_uri }}/splash&pos=1" width="300" height="250" scrolling="no"
-                                frameborder="0" marginheight="0" marginwidth="0"
-                                style="margin:0; padding: 0; border: 0"
-                        ></iframe>
-                    </div>
-                    <div class="link"><a
-                                href="{% if content_item.Type == "video-link" %}{% link content_item.Link, with_trade = true %}{% else %}{% link "content", id = content_item.Id, slug = content_item.Slug, categories = content_item.Categories, with_trade = true %}{% endif %}"
-                                rel="noopener nofollow"
-                        >{{ translate("close and play") }}</a>
-                    </div>
-                </div>
-            </div>
-        </div>
-    {% elif content_item.Type == "video-embed" %}
-        {% set iframe = parse_iframe(content_item.Content) %}
-        <div class="video-holder">
-            <div class="video" data-id="{{ content_item.Id }}" data-type="{{ content_item.Type }}"
-                 data-splash-url="{{config.Custom.ttt_tds_uri}}/splash" data-under-url="{{config.Custom.ttt_tds_uri}}/pplink"
-                 style="--aspect-ratio: {{ iframe.Height }} / {{ iframe.Width }}">
-                <iframe
-                        src="{{ iframe.Src }}" width="{{ iframe.Width }}" height="{{ iframe.Height }}"
-                        allowfullscreen frameborder="0" marginheight="0" marginwidth="0"
-                        style="margin:0; padding: 0; border: 0"
-                ></iframe>
-                <div class="insert" style="display: none">
-                    <div class="close"><a
-                                href="{% if content_item.Type == "video-link" %}{% link content_item.Link, with_trade = true %}{% else %}{% alternate lang.Id %}{% endif %}"
-                                rel="noopener nofollow"
-                        ><i
-                                    class="icon-cross"></i></a></div>
-                    <div class="a">
-                        <iframe
-                                src="{{config.Custom.ttt_tds_uri}}/splash?pos=1" width="300" height="250" scrolling="no"
-                                frameborder="0" marginheight="0" marginwidth="0"
-                                style="margin:0; padding: 0; border: 0"
-                        ></iframe>
-                    </div>
-                    <div class="link"><a
-                                href="{% if content_item.Type == "video-link" %}{% link content_item.Link, with_trade = true %}{% else %}{% link "content", id = content_item.Id, slug = content_item.Slug, categories = content_item.Categories, with_trade = true %}{% endif %}"
-                                rel="noopener nofollow"
-                        >{{ translate("close and play") }}</a>
-                    </div>
-                </div>
-            </div>
-        </div>
-    {% elif content_item.Type == "video" %}
-        <div class="video-holder">
-            {% import "common/show-hosted-video.twig" show_hosted_video %}
-            {{ show_hosted_video(content_item) }}
-        </div>
-    {% elif content_item.Type == "gallery" %}
-        <div class="video-holder">
-            {% import "common/show-gallery.twig" show_gallery %}
-            {{ show_gallery(content_item) }}
-        </div>
-    {% endif %}
-        <div class="avt">
-            <iframe src="{{ config.Custom.ttt_tds_uri }}/video?pos=1" width="300" height="250" scrolling="no"
-                    frameborder="0" marginheight="0" marginwidth="0"></iframe>
-            <iframe src="{{ config.Custom.ttt_tds_uri }}/video?pos=2" width="300" height="250" scrolling="no"
-                    frameborder="0" marginheight="0" marginwidth="0"></iframe>
-        </div>
-        </div>
-        <div class="report-dmca">
-            <a href="#" class="dmca-link" data-id="{{ content_item.Id }}" data-thumb-url="{{ content_item.Thumb() }}">
-                <i class="icon-flag padded"></i>Remove content</a>
-        </div>
-        <div class="video-cat-list">
-            {% for cat in content_item.Categories %}
-                <a href="{% link "category", id = cat.Id, slug = cat.Slug %}"
-                   title="{{ cat.Title }}">{{ cat.Title }}</a>
-            {% endfor %}
-        </div>
-        <h3 class="list-title">{{ translate("Related videos") }}</h3>
-        <main class="thumbs">
-            {% for item in related %}
-                {{ show_content(item) }}
-            {% endfor %}
-        </main>
+	{% import "common/show-content.twig" show_content %}
+	<div class="video-wrapper">
+		<h1 class="list-title">
+			<i class="icon-camera padded"></i>
+			{{ title }}</h1>
+		{% if content_item.Type == "video-link" %}
+			<div class="video-holder">
+				<div class="video" 
+				data-id="{{ content_item.Id }}" data-type="{{ content_item.Type }}" data-splash-url="{{ config.Custom.ttt_tds_uri }}/splash" 
+				data-under-url="{{ config.Custom.ttt_tds_uri}}/pplink" style="--aspect-ratio: {{ content_item.GetThumbFormat().Height }}/{{ content_item.GetThumbFormat().Width }}"
+				>
+					<iframe src="{% link "fake_player", slug = content_item.Slug, id = content_item.Id %}" allowfullscreen style="margin:0; padding: 0; border: 0" frameborder="0" marginheight="0" marginwidth="0" width="{{ content_item.GetThumbFormat().Width }}" height="{{ content_item.GetThumbFormat().Height }}" class="responsive"></iframe>
+					<div class="insert" style="display: none">
+						<div class="close">
+							<a href="{% if content_item.Type == "video-link" %}{% link content_item.Link, with_trade = true %}{% else %}{% alternate lang.Id %}{% endif %}" rel="noopener nofollow">
+								<i class="icon-cross"></i>
+							</a>
+						</div>
+						<div class="a">
+							<iframe src="{{ config.Custom.ttt_tds_uri }}/splash&pos=1" width="300" height="250" scrolling="no" frameborder="0" marginheight="0" marginwidth="0" style="margin:0; padding: 0; border: 0"></iframe>
+						</div>
+						<div class="link">
+							<a href="{% if content_item.Type == "video-link" %}{% link content_item.Link, with_trade = true %}{% else %}{% link "content", id = content_item.Id, slug = content_item.Slug, categories = content_item.Categories, with_trade = true %}{% endif %}" rel="noopener nofollow">{{ translate("close and play") }}</a>
+						</div>
+					</div>
+				</div>
+			</div>
+		{% elif content_item.Type == "video-embed" %}
+			{% set iframe = parse_iframe(content_item.Content) %}
+			<div class="video-holder">
+				<div class="video" data-id="{{ content_item.Id }}" data-type="{{ content_item.Type }}" data-splash-url="{{config.Custom.ttt_tds_uri}}/splash" data-under-url="{{config.Custom.ttt_tds_uri}}/pplink" style="--aspect-ratio: {{ iframe.Height }} / {{ iframe.Width }}">
+					<iframe src="{{ iframe.Src }}" width="{{ iframe.Width }}" height="{{ iframe.Height }}" allowfullscreen frameborder="0" marginheight="0" marginwidth="0" style="margin:0; padding: 0; border: 0"></iframe>
+					<div class="insert" style="display: none">
+						<div class="close">
+							<a href="{% if content_item.Type == "video-link" %}{% link content_item.Link, with_trade = true %}{% else %}{% alternate lang.Id %}{% endif %}" rel="noopener nofollow">
+								<i class="icon-cross"></i>
+							</a>
+						</div>
+						<div class="a">
+							<iframe src="{{config.Custom.ttt_tds_uri}}/splash?pos=1" width="300" height="250" scrolling="no" frameborder="0" marginheight="0" marginwidth="0" style="margin:0; padding: 0; border: 0"></iframe>
+						</div>
+						<div class="link">
+							<a href="{% if content_item.Type == "video-link" %}{% link content_item.Link, with_trade = true %}{% else %}{% link "content", id = content_item.Id, slug = content_item.Slug, categories = content_item.Categories, with_trade = true %}{% endif %}" rel="noopener nofollow">{{ translate("close and play") }}</a>
+						</div>
+					</div>
+				</div>
+			</div>
+		{% elif content_item.Type == "video" %}
+			<div class="video-holder">
+				{% import "common/show-hosted-video.twig" show_hosted_video %}
+				{{ show_hosted_video(content_item) }}
+			</div>
+		{% elif content_item.Type == "gallery" %}
+			<div class="video-holder">
+				{% import "common/show-gallery.twig" show_gallery %}
+				{{ show_gallery(content_item) }}
+			</div>
+		{% endif %}
+		<div class="avt">
+			<iframe src="{{ config.Custom.ttt_tds_uri }}/video?pos=1" width="300" height="250" scrolling="no" frameborder="0" marginheight="0" marginwidth="0"></iframe>
+			<iframe src="{{ config.Custom.ttt_tds_uri }}/video?pos=2" width="300" height="250" scrolling="no" frameborder="0" marginheight="0" marginwidth="0"></iframe>
+		</div>
+	</div>
+	<div class="report-dmca">
+		<a href="#" class="dmca-link" data-id="{{ content_item.Id }}" data-thumb-url="{{ content_item.Thumb() }}">
+			<i class="icon-flag padded"></i>Remove content</a>
+	</div>
+	<div class="video-cat-list">
+		{% for cat in content_item.Categories %}
+			<a href="{% link "category", id = cat.Id, slug = cat.Slug %}" title="{{ cat.Title }}">{{ cat.Title }}</a>
+		{% endfor %}
+	</div>
+	<h3 class="list-title">{{ translate("Related videos") }}</h3>
+	<main class="thumbs">
+		{% for item in related %}
+			{{ show_content(item) }}
+		{% endfor %}
+	</main>
 {% endblock %}
