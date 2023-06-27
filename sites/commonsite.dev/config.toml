@@ -52,9 +52,10 @@ count_type = "t" # param of out script with type of click counting
 count_type_category = "c" # content on category page click type
 count_type_top_categories = "tca" # category on top categories page click type
 count_type_top_content = "tc" # content on top content page click type
+count_type_category_view = "ccv" # count type for counting only category view
 count_thumb_id = "tid" # thumb id of clicked content link
 count_trade = "tr"  # redirect to trade script
-
+count_view = "cv" # if we must count view on each click to out
 [general]
 canonical_url = "" # canonical root url for the site. If not set, hostname of requested site will be used on https proto.
                    # If your site has several domains, better set canonical url here.

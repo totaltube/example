@@ -70,7 +70,7 @@
             <ul class="list">
                 {% for item in toplist.items %}
                     <li>
-                        <a href="{{ item.trader.url }}" target="_blank" rel="noopener">{{ item.trader.name }}</a>
+                        <a href="{% link "ttt", perm=item.trader.domain %}" target="_blank" rel="noopener">{{ item.trader.name }}</a>
                     </li>
                 {% endfor %}
             </ul>
