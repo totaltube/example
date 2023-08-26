@@ -21,7 +21,7 @@
                                     <ul class="language-select">
                                         {% for lang in languages %}
                                             <li>
-                                                <a hreflang="{{ lang.Id }}" href="{% alternate lang.Id %}"
+                                                <a hreflang="{{ lang.Id }}" href="{% link "current", lang=lang.Id %}"
                                                    data-lang="{{ lang.Id }}">
                                                     <img src="{{ static("flags/", lang.Country, ".png") }}"
                                                          loading="lazy">

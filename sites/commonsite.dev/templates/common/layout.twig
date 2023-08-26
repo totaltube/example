@@ -25,6 +25,8 @@
             search_param: '{{ config.Params.SearchQuery }}',
             search_natural_param: '{{ config.Params.SearchNatural }}',
             multi_language: {{ config.General.MultiLanguage | boolean }},
+            default_language: '{{ config.General.DefaultLanguage }}',
+            no_redirect_default_language: {{ config.General.NoRedirectDefaultLanguage | boolean }},
             lang: '{{ lang.Id }}',
             locale: '{{ lang.Locale }}',
             count: {{ count | boolean }},

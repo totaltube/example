@@ -15,6 +15,8 @@ type Globals = {
     search_param: string
     search_natural_param: string
     multi_language: boolean
+    default_language?: string
+    no_redirect_default_language?: boolean
     lang: string
     locale: string
     dmca: string
@@ -77,7 +79,7 @@ document.addEventListener("DOMContentLoaded", function () {
             .replace("{slug}", encodeURIComponent(item.slug || ""))
             .replace("{id}", item.id?.toString() || "")
             .replace("{query}", encodeURIComponent(item.suggest || ""))
-        if (globals.multi_language) {
+        if (globals.multi_language && (globals.default_language !== globals.lang || !globals.no_redirect_default_language)) {
             url_template = globals.lang_template.replace("{lang}", globals.lang).replace("{route}", url_template)
         }
         if (addQueryParam) {
@@ -91,7 +93,7 @@ document.addEventListener("DOMContentLoaded", function () {
         input.closest("form").addEventListener("submit", function (e) {
             e.preventDefault()
             let searchUrl = globals.search
-            if (globals.multi_language) {
+            if (globals.multi_language && (globals.default_language !== globals.lang || !globals.no_redirect_default_language)) {
                 searchUrl = globals.lang_template
                     .replace("{lang}", globals.lang)
                     .replace("{route}", globals.search)
@@ -122,7 +124,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     } catch (e) {
                     }
                     let autocompleteUrl = globals.autocomplete
-                    if (globals.multi_language) {
+                    if (globals.multi_language && (globals.default_language !== globals.lang || !globals.no_redirect_default_language)) {
                         autocompleteUrl = globals.lang_template
                             .replace("{lang}", globals.lang)
                             .replace("{route}", globals.autocomplete)
@@ -299,7 +301,7 @@ document.addEventListener("DOMContentLoaded", function () {
         sessionStorage.setItem("dmca-last-email", data.email)
         sessionStorage.setItem("dmca-last-info", data.info)
         let dmcaUrl = globals.dmca
-        if (globals.multi_language) {
+        if (globals.multi_language && (globals.default_language !== globals.lang || !globals.no_redirect_default_language)) {
             dmcaUrl = globals.lang_template.replace("{route}", dmcaUrl).replace("{lang}", globals.lang)
         }
         fetch(dmcaUrl, {

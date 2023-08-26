@@ -62,7 +62,11 @@ canonical_url = "" # canonical root url for the site. If not set, hostname of re
 
 trade_url_template = "/ttt/o?url={{encoded_url}}" # trade script url template,
 # can have {{encoded_url}} for url encoded redirect url or {{url}} as raw redirect url
+
 multi_language = true # if this site is multilingual
+default_language = "en" # Default language if your site is multilingual
+no_redirect_default_language = true # Default language = x-default and do not have a separate route.
+
 minify_html = false # if yes, html output from template will be minified (makes a little impact on server cpu usage)
 pagination_max_rendered_links = 15 # Maximum rendered page links, default 10
 models_per_page = 20 # Number of models per page on models page

@@ -8,6 +8,7 @@ api_url = "https://totaltube-test-main.totaltraffictrader.com/api/v1/" # With tr
 api_secret = "0KzitIKqVkQ28oFwFYzRjzMiqBiKAqRI9U8X57oL"
 api_timeout = "30 seconds"
 geoip_url = "https://totaltraffictrader.com/geo/country.tar.gz" # URL of geoip country database.
+development = true
 
 [frontend]
 sites_path = "./sites"

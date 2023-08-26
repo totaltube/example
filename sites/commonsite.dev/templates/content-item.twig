@@ -100,6 +100,9 @@
 			<iframe src="{{ config.Custom.ttt_tds_uri }}/video?pos=2" width="300" height="250" scrolling="no" frameborder="0" marginheight="0" marginwidth="0"></iframe>
 		</div>
 	</div>
+	{% if content_item.HasCustomField("myfield") %}
+	<div>{{ content_item.CustomField("myfield") }}, {{ content_item.CustomTranslation("myfield")}}</div>
+	{% endif %}
 	<div class="report-dmca">
 		<a href="#" class="dmca-link" data-id="{{ content_item.Id }}" data-thumb-url="{{ content_item.Thumb() }}">
 			<i class="icon-flag padded"></i>Remove content</a>
