@@ -98,3 +98,6 @@ destination = "" # destination path relative to public. If empty - place result 
 images_path = "images" # images resolution from this path relative to scss path
 fonts_path = "fonts" # fonts resolution from this path relative to scss path
 minify = true # minify resulting css
+
+[sitemap]
+max_links=2
