@@ -21,3 +21,4 @@ captcha_whitelist = ["to@sersh.com"] # Whitelist of emails which doesn't need to
 
 [database]
 path = "./database"
+low_memory = true

@@ -1,0 +1,28 @@
+<url>
+    {% set video_url = "https://" | add:host | add:link("content_item", "slug", content_item.Slug, "id", content_item.Id, "categories", content_item.Categories) %}
+    <loc>{{ video_url }}</loc>
+    <lastmod>{{ now.Format("2006-01-02")}}</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+    <video:video>
+        <video:thumbnail_loc>{{ content_item.HiresThumb() }}</video:thumbnail_loc>
+        <video:title>{% cdata content_item.Title %}</video:title>
+        {% if content_item.Description %}
+        <video:description>{% cdata content_item.Description %}</video:description>
+        {% endif %}
+        {% set player_loc = "https://" | add:host | add:link("fake_player", "slug", content_item.Slug, "id", content_item.Id) %}
+        <video:player_loc>{{ player_loc }}</video:player_loc>
+        <video:view_count>{{ content_item.Views }}</video:view_count>
+        <video:publication_date>{{ content_item.Dated.Format("2006-01-02") }}</video:publication_date>
+        <video:duration>{{ content_item.Duration }}</video:duration>
+        {% for category in content_item.Categories | max:32 %}
+        <video:tag>{% cdata category.Title %}</video:tag>
+        {% endfor %}
+    </video:video>
+    {% if config.General.MultiLanguage %}
+    {% for lang in languages %}
+    {% set alt = "https://" | add:host | add:link("content_item", "slug", content_item.Slug, "id", content_item.Id, "categories", content_item.Categories, "lang", lang.Id) %}
+    <xhtml:link rel="alternate" hreflang="{{lang.Id}}" href="{{alt}}"></xhtml:link>
+    {% endfor %}
+    {% endif %}
+</url>

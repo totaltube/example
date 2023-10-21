@@ -34,6 +34,6 @@
             "description": "{{ description }}",
             "thumbnailUrl": "{{ content_item.HiresThumb() }}",
             "duration": "{{ duration8601(content_item.Duration) }}",
-            "embedUrl": "https://vcdn.{{ host }}/embed/{{ embed_slug(content_item.Content) }}"
+            "embedUrl": "https://{{ host }}{% link "video_embed", slug=content_item.Slug, id=content_item.Id %}"
         }
     </script>

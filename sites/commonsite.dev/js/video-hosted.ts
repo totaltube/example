@@ -1,5 +1,5 @@
 import "plyr/dist/plyr.css"
-import Plyr  from "plyr"
+import Plyr from "plyr"
 
 
 // Doing everything after html loaded.
