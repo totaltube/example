@@ -1,24 +1,30 @@
 // Function must return cache key, it may be based on some params or querystring
 // path params are available in var "params" and query params in var "query"
 function cacheKey() {
-    return ""
+    const p = query['page'] || 1
+    return `niche-${p}-${lang.Id}`
 }
 
 // function must return cache ttl in seconds
 function cacheTtl() {
-    return 0
+    return 5
 }
 
 // function prepare will return object with vars which will be available in templates
 function prepare() {
-    var out = fetch("content").WithQueryParam("sort", "rand1").WithQueryParam("amount", "78").Json()
-    if (out.success) {
-        return {
-            "items": out.value.items
-        }
-    }
+    let p = page
+    if (p <= 1) p = 1
+    const content = get_content("sort", "rand", "amount", 5, "page", p)
+    const category = get_category("category_slug", "red")
     return {
-        "items": []
+        "category": category,
+        "count": true,
+        "content": content,
+        "total": content.Total,
+        "from": content.From,
+        "to": content.To,
+        "page": content.Page,
+        "pages": content.Pages
     }
 }
 

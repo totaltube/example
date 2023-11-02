@@ -24,6 +24,7 @@ ttt = "/ttt/o" # stub trade out for development
 ttt_image = "/ttt/toplist/{hash}${domain}@{size}.jpg" # stub for toplist images
 ttt_tds = "/ttt/tds/{scheme}" # stub for tds schemes
 random = "/random" # custom page with random content
+random_multilang = "/{lang}/random" # custom page with random content for multilingual sites
 
 [params] # Query params name override
 content_slug = "slug"

@@ -21,8 +21,7 @@
     <main class="thumbs">
         {% set toplist = fetch_toplist("", 8, true) %}
         {% repeat "ad", amount = 4, as = ads_list %}
-        {% set content = get_content("sort", "rand1") %}
-        {% dilute items, ads_list, from = 0, to = 50, as = items %}
+        {% dilute content.Items, ads_list, from = 0, to = 50, as = items %}
         {% for item in items %}
             {% if item == "ad" %}
                 {{ show_ad("native1", forloop.Counter, false) }}
