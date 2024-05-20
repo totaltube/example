@@ -9,6 +9,8 @@ api_secret = "0KzitIKqVkQ28oFwFYzRjzMiqBiKAqRI9U8X57oL"
 api_timeout = "30 seconds"
 geoip_url = "https://totaltraffictrader.com/geo/country.tar.gz" # URL of geoip country database.
 development = true
+default_blackhole_route = "/blackhole" # Default route for blackhole to catch bad bots
+check_for_bots = true # Check for bots accessing blackhole routes and block them
 
 [frontend]
 sites_path = "./sites"

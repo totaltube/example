@@ -16,6 +16,7 @@ fake_player = "/player/{slug}" # URL of fake video player, can have {slug} or {i
 video_embed = "/embed/{slug}" # URL of video embed for hosted video
 dmca = "/dmca" # dmca report uri
 out = "/c" # URL of out script
+rating = "/rating/{id}" # URL to rating count api. Must contain {id} or {slug} param
 language_template = "/{lang}{route}" #template for language id in route for multilingual sites if multi_language is true
 
 [routes.custom] # custom routes, you must define custom content for this routes with javascript module

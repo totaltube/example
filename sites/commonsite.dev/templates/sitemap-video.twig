@@ -10,7 +10,7 @@
         {% if content_item.Description %}
         <video:description>{% cdata content_item.Description %}</video:description>
         {% endif %}
-        {% set player_loc = "https://" | add:host | add:link("fake_player", "slug", content_item.Slug, "id", content_item.Id) %}
+        {% set player_loc = "https://" | add:host | add:link("video_embed", "slug", content_item.Slug, "id", content_item.Id) %}
         <video:player_loc>{{ player_loc }}</video:player_loc>
         <video:view_count>{{ content_item.Views }}</video:view_count>
         <video:publication_date>{{ content_item.Dated.Format("2006-01-02") }}</video:publication_date>
