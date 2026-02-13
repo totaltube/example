@@ -18,6 +18,10 @@ $comments-count-font-size: $font-size-smaller;
   --comment-indent-step: 18px;
   --comment-indent-max: 5;
 
+  .hidden {
+    display: none !important;
+  }
+
   ul {
     list-style: none;
     padding: 0;

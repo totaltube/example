@@ -46,10 +46,12 @@
                 <button class="dislike-button {% if comment.IsDisliked %}active{% endif %}" aria-label="{{ translate("Dislike") }}">
                     <span class="c-icon"></span>
                 </button>
-                <button class="reply-button">{{ translate("Reply") }}</button>
+                {% set current_site_id = config.SiteId %}
+                {% set is_cross_site = current_site_id > 0 and comment.SiteId > 0 and comment.SiteId != current_site_id %}
+                <button class="reply-button {% if comment.Indent >= 10 or is_cross_site %}hidden{% endif %}">{{ translate("Reply") }}</button>
                 <a class="comment-permalink" href="#comment-{{ comment.CommentId }}" aria-label="Comment link">#</a>
             </div>
-            <div class="comment-reply">
+            <div class="comment-reply {% if comment.Indent >= 10 or is_cross_site %}hidden{% endif %}">
                 <textarea class="comment-input" placeholder="{{ translate("Write a reply...") }}"></textarea>
                 <button class="send-comment-button">{{ translate("Reply") }}</button>
             </div>

@@ -14,8 +14,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const i18nNoComments = commentsSection?.getAttribute("data-i18n-no-comments") || "No comments yet."
     const i18nMoreReplies = commentsSection?.getAttribute("data-i18n-more-replies") || "More {count} replies"
     const i18nLoading = commentsSection?.getAttribute("data-i18n-loading") || "Loading..."
+    const currentSiteId = toNumber(commentsSection?.getAttribute("data-site-id"), 0)
     const INITIAL_VISIBLE_REPLIES = 2
     const LOAD_MORE_BATCH = 5
+    const MAX_INDENT = 9
+    const MAX_SIBLINGS = 1000
 
     // Helper to find parent comment container
     function getCommentContainer(el: Element): Element | null {
@@ -115,6 +118,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     interface Comment {
         CommentId: number
+        SiteId: number
         ParentId: number
         Indent: number
         ReplyCount: number
@@ -139,6 +143,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const parentId = toNumber(raw?.ParentId ?? raw?.parent_id ?? fallback.ParentId, 0)
         return {
             CommentId: toNumber(raw?.CommentId ?? raw?.comment_id ?? fallback.CommentId, 0),
+            SiteId: toNumber(raw?.SiteId ?? raw?.site_id ?? fallback.SiteId, 0),
             ParentId: parentId,
             Indent: toNumber(raw?.Indent ?? raw?.indent ?? fallback.Indent, parentId > 0 ? 1 : 0),
             ReplyCount: toNumber(raw?.ReplyCount ?? raw?.reply_count ?? fallback.ReplyCount, 0),
@@ -218,6 +223,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const dislikeBtn = container.querySelector(".dislike-button") as HTMLElement
         if (comment.IsDisliked) dislikeBtn.classList.add("active")
+
+        const replyBtn = container.querySelector(".reply-button") as HTMLElement
+        if (replyBtn) {
+            // Hide reply button if indent is too deep OR if comment is from another site
+            // If currentSiteId is 0 (not found), we allow replying (assuming monolithic/simple setup)
+            // unless we want to be strict. Let's be consistent with template logic.
+            const isCrossSite = currentSiteId > 0 && comment.SiteId > 0 && comment.SiteId !== currentSiteId
+
+            if (comment.Indent >= MAX_INDENT || isCrossSite) {
+                replyBtn.classList.add("hidden")
+                // Also hide the whole reply box container if it exists
+                container.querySelector(".comment-reply")?.classList.add("hidden")
+            }
+        }
 
         return li
     }
@@ -392,7 +411,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         const remainingDescendants = Math.max(0, totalReplies - visibleDescendants)
-        if (remainingDirect <= 0 && remainingDescendants <= 0) {
+        if ((remainingDirect <= 0 && remainingDescendants <= 0) || visibleDirectChildren.length >= MAX_SIBLINGS) {
             const existing = document.querySelector(`.comment-more-item[data-parent-id="${parentId}"]`) as HTMLElement | null
             if (existing) {
                 existing.remove()
@@ -508,13 +527,14 @@ document.addEventListener("DOMContentLoaded", () => {
         const hotSize = Math.max(0, Math.min(5, toNumber(commentsSection?.getAttribute("data-hot-size"), 0)))
         const hotMinLikes = Math.max(1, toNumber(commentsSection?.getAttribute("data-hot-min-likes"), 1))
         const initialRepliesLimit = Math.max(1, toNumber(commentsSection?.getAttribute("data-initial-replies-limit"), INITIAL_VISIBLE_REPLIES))
+        const siteId = toNumber(commentsSection?.getAttribute("data-site-id"), 0)
         if (token) {
             headers["X-Comment-Token"] = token
         }
 
         try {
             const res = await fetch(
-                `${endpoint}/list?content_id=${contentId}&sort=${encodeURIComponent(sort)}&size=${size}&replies_limit=${initialRepliesLimit}&hot_size=${hotSize}&hot_min_likes=${hotMinLikes}`,
+                `${endpoint}/list?content_id=${contentId}&sort=${encodeURIComponent(sort)}&size=${size}&replies_limit=${initialRepliesLimit}&hot_size=${hotSize}&hot_min_likes=${hotMinLikes}&site_id=${siteId}`,
                 { headers },
             )
             const json = await res.json()
@@ -544,18 +564,20 @@ document.addEventListener("DOMContentLoaded", () => {
         const sort = commentsSection?.getAttribute("data-sort") || "threads_recent"
         const threadDirectSize = Math.max(1, toNumber(commentsSection?.getAttribute("data-thread-direct-size"), LOAD_MORE_BATCH))
         const threadRepliesLimit = Math.max(1, toNumber(commentsSection?.getAttribute("data-thread-replies-limit"), INITIAL_VISIBLE_REPLIES))
+        const siteId = toNumber(commentsSection?.getAttribute("data-site-id"), 0)
         const { directReplyTotal } = getParentMeta(parentContainer)
 
         const directChildren = getDirectChildLis(parentLi, parentContainer)
         const hiddenDirect = directChildren.filter((li) => (li as HTMLElement).style.display === "none")
-        let from = directChildren.length
+        let cursor = parentContainer.getAttribute("data-next-cursor") || ""
         let size = threadDirectSize
         let requestRepliesLimit = Math.max(1, toNumber(parentContainer.getAttribute("data-thread-replies-limit-current"), threadRepliesLimit))
 
-        // Direct replies are fully loaded, but descendants can still be truncated by replies_limit.
-        // Re-query current direct window with increased descendants depth to reveal more nested replies.
-        if (directReplyTotal >= 0 && from >= directReplyTotal) {
-            from = 0
+        // If direct replies were previously loaded but descendants were truncated, we might need to increase depth?
+        // But with cursor pagination, if we have a cursor, we use it. 
+        // If we don't have a cursor but directReplyTotal > visible, it means we might be in the 'increased depth' scenario.
+        if (!cursor && directReplyTotal >= 0 && directChildren.length >= directReplyTotal) {
+            cursor = "" // start from scratch with more depth
             size = Math.max(1, Math.min(50, directReplyTotal))
             requestRepliesLimit = Math.min(50, requestRepliesLimit + threadRepliesLimit)
             parentContainer.setAttribute("data-thread-replies-limit-current", requestRepliesLimit.toString())
@@ -574,7 +596,7 @@ document.addEventListener("DOMContentLoaded", () => {
         moreBtn.textContent = i18nLoading
         try {
             const json = await requestJsonWithAuthRetry(
-                `${endpoint}/thread?content_id=${contentId}&parent_id=${parentId}&from=${from}&size=${size}&sort=${encodeURIComponent(sort)}&replies_limit=${requestRepliesLimit}`,
+                `${endpoint}/thread?content_id=${contentId}&parent_id=${parentId}&cursor=${encodeURIComponent(cursor)}&size=${size}&sort=${encodeURIComponent(sort)}&replies_limit=${requestRepliesLimit}&site_id=${siteId}`,
                 { method: "GET", headers },
             )
 
@@ -582,6 +604,9 @@ document.addEventListener("DOMContentLoaded", () => {
             if (apiTotal >= 0) {
                 // Backend thread total is direct replies total for this parent.
                 parentContainer.setAttribute("data-direct-reply-total", apiTotal.toString())
+            }
+            if (json?.next_cursor !== undefined) {
+                parentContainer.setAttribute("data-next-cursor", json.next_cursor || "")
             }
 
             // Always reveal a portion of already-loaded hidden direct replies first.
