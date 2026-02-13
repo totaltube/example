@@ -1,0 +1,139 @@
+// Defining variables for colors, sizes, etc.
+$primary-color: #4a76a8;
+$secondary-color: #f3f4f6;
+$text-color: #2c2d2e;
+$border-color: #e1e3e6;
+$avatar-size: 40px;
+
+.comment-container {
+  display: flex;
+  padding: 10px;
+  border-bottom: 1px solid $border-color;
+  &:hover {
+    background-color: $secondary-color;
+  }
+
+  .avatar {
+    width: $avatar-size;
+    height: $avatar-size;
+    border-radius: 50%;
+    margin-right: 10px;
+    background-color: lighten($primary-color, 30%);
+    img {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+    }
+  }
+
+  .comment-content {
+    flex: 1;
+    .comment-username {
+      font-weight: bold;
+      color: $primary-color;
+      margin-bottom: 5px;
+      display: block;
+    }
+    .comment-text {
+      color: $text-color;
+      line-height: 1.5;
+      margin-bottom: 10px;
+    }
+    .comment-actions {
+      font-size: 12px;
+      color: lighten($text-color, 20%);
+      display: flex;
+      gap: 15px;
+      span {
+        cursor: pointer;
+        &:hover {
+          text-decoration: underline;
+        }
+      }
+    }
+  }
+}
+
+.add-comment {
+  display: flex;
+  padding: 10px;
+  border-top: 1px solid $border-color;
+
+  .avatar {
+    width: $avatar-size;
+    height: $avatar-size;
+    border-radius: 50%;
+    margin-right: 10px;
+    background-color: lighten($primary-color, 30%);
+    img {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+    }
+  }
+
+  .input-container {
+    flex: 1;
+    textarea {
+      width: 100%;
+      height: 50px;
+      padding: 10px;
+      border: 1px solid $input-border-color;
+      border-radius: 4px;
+      resize: none;
+      font-size: 14px;
+      color: $text-color;
+      &:focus {
+        border-color: $primary-color;
+        outline: none;
+      }
+    }
+    .actions {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 10px;
+
+      .submit-btn {
+        background-color: $primary-color;
+        color: white;
+        padding: 6px 12px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        &:hover {
+          background-color: darken($primary-color, 10%);
+        }
+      }
+    }
+  }
+}
+
+// The example HTML structure for a comment component
+/*
+<div class="comment-container">
+  <div class="avatar">
+    <img src="avatar.jpg" alt="User Avatar">
+  </div>
+  <div class="comment-content">
+    <span class="comment-username">Username</span>
+    <div class="comment-text">This is a comment text.</div>
+    <div class="comment-actions">
+      <span>Reply</span>
+      <span>Like</span>
+      <span>Share</span>
+    </div>
+  </div>
+</div>
+
+<div class="add-comment">
+  <div class="avatar">
+    <img src="avatar.jpg" alt="User Avatar">
+  </div>
+  <div class="input-container">
+    <textarea placeholder="Add a comment..."></textarea>
+    <div class="actions">
+      <button class="submit-btn">Post</button>
+    </div>
+  </div>
+</div>
+*/
