@@ -1,0 +1,58 @@
+<li>
+    {% set reply_to_name = comment.ReplyToUsername %}
+    {% if not reply_to_name and comment.ParentId > 0 and comments and comments.Items %}
+        {% for parent_comment in comments.Items %}
+            {% if parent_comment.CommentId == comment.ParentId %}
+                {% set reply_to_name = parent_comment.Username %}
+            {% endif %}
+        {% endfor %}
+    {% endif %}
+    <div
+        class="comment-container{% if comment.ParentId > 0 %} is-reply{% endif %}"
+        id="comment-{{ comment.CommentId }}"
+        data-comment-id="{{ comment.CommentId }}"
+        data-parent-id="{{ comment.ParentId }}"
+        data-reply-count="{{ comment.ReplyCount }}"
+        data-reply-to-username="{{ reply_to_name }}"
+        data-indent="{{ comment.Indent }}"
+        style="--comment-indent: {{ comment.Indent }};"
+    >
+        <div class="avatar">
+            {% if comment.Avatar %}
+                <img src="{{ comment.Avatar }}" alt="{{ comment.Username }}">
+            {% else %}
+                <img src="/images/avatar_placeholder.png" alt="User Avatar">
+            {% endif %}
+        </div>
+        <div class="comment-content">
+            <span class="comment-username">{{ comment.Username }}</span>
+            <div class="comment-context{% if comment.ParentId <= 0 %} hidden{% endif %}">
+                {% if comment.ParentId > 0 %}
+                    {% if reply_to_name %}
+                        {{ translate("Replying to") }}
+                        <a class="comment-parent-link" href="#comment-{{ comment.ParentId }}">@{{ reply_to_name }}</a>
+                    {% else %}
+                        {{ translate("Replying to") }}
+                        <a class="comment-parent-link" href="#comment-{{ comment.ParentId }}">#{{ comment.ParentId }}</a>
+                    {% endif %}
+                {% endif %}
+            </div>
+            <div class="comment-text">{{ comment.Text }}</div>
+            <div class="comment-actions">
+                <button class="like-button {% if comment.IsLiked %}active{% endif %}" aria-label="{{ translate("Like") }}">
+                    <span class="c-icon"></span>
+                </button>
+                <span class="score-count">{{ comment.Likes - comment.Dislikes }}</span>
+                <button class="dislike-button {% if comment.IsDisliked %}active{% endif %}" aria-label="{{ translate("Dislike") }}">
+                    <span class="c-icon"></span>
+                </button>
+                <button class="reply-button">{{ translate("Reply") }}</button>
+                <a class="comment-permalink" href="#comment-{{ comment.CommentId }}" aria-label="Comment link">#</a>
+            </div>
+            <div class="comment-reply">
+                <textarea class="comment-input" placeholder="{{ translate("Write a reply...") }}"></textarea>
+                <button class="send-comment-button">{{ translate("Reply") }}</button>
+            </div>
+        </div>
+    </div>
+</li>

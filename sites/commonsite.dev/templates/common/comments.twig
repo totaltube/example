@@ -1,0 +1,81 @@
+{# comments.twig #}
+{% fetch "comments", amount = 50, sort = "threads_recent", replies_limit = 2, hot_size = 3, hot_min_likes = 2 %}
+    <div
+        class="comments"
+        data-content-id="{{ content_item.Id }}"
+        data-sort="threads_recent"
+        data-size="50"
+        data-hot-size="3"
+        data-hot-min-likes="2"
+        data-initial-replies-limit="2"
+        data-thread-direct-size="5"
+        data-thread-replies-limit="2"
+        data-i18n-replying-to="{{ translate("Replying to") }}"
+        data-i18n-no-comments="{{ translate("No comments yet.") }}"
+        data-i18n-more-replies="{{ translate("More {count} replies") }}"
+        data-i18n-loading="{{ translate("Loading...") }}"
+    >
+        <ul>
+        {% if comments.HotItems or comments.Items %}
+            {% if comments.HotItems %}
+                {% for comment in comments.HotItems %}
+                    {% include "../comment-item.twig" %}
+                {% endfor %}
+            {% endif %}
+            {% for comment in comments.Items %}
+                {% include "../comment-item.twig" %}
+            {% endfor %}
+        {% else %}
+            <li><p>{{ translate("No comments yet.") }}</p></li>
+        {% endif %}
+        </ul>
+        <div class="comment-form auth-protected-content">
+            <div class="auth-profile" style="display: none;">
+                <div class="auth-user-info">
+                    <img class="auth-user-avatar" src="/images/avatar_placeholder.png" alt="User">
+                    <span class="auth-user-name"></span>
+                </div>
+                <a href="#" class="auth-logout-btn">{{ translate("Logout") }}</a>
+            </div>
+            <div class="input-container">
+                <textarea placeholder="{{ translate("Write a comment") }}"></textarea>
+                <div class="actions">
+                    <button class="submit-btn">{{ translate("Send") }}</button>
+                </div>
+            </div>
+        </div>
+        <div class="auth-login-container">
+            <button class="auth-login-btn">{{ translate("Login to comment") }}</button>
+        </div>
+    </div>
+{% endfetch %}
+
+<template id="comment-template-js">
+    <li>
+        <div class="comment-container" id="" data-comment-id="" data-parent-id="0" data-reply-count="0" data-indent="0" style="--comment-indent: 0;">
+            <div class="avatar">
+                <img src="/images/avatar_placeholder.png" alt="User Avatar">
+            </div>
+            <div class="comment-content">
+                <span class="comment-username"></span>
+                <div class="comment-context"></div>
+                <div class="comment-text"></div>
+                <div class="comment-actions">
+                    <button class="like-button" aria-label="{{ translate("Like") }}">
+                        <span class="c-icon"></span>
+                    </button>
+                    <span class="score-count">0</span>
+                    <button class="dislike-button" aria-label="{{ translate("Dislike") }}">
+                        <span class="c-icon"></span>
+                    </button>
+                    <button class="reply-button">{{ translate("Reply") }}</button>
+                    <a class="comment-permalink" href="#" aria-label="Comment link">#</a>
+                </div>
+                <div class="comment-reply">
+                    <textarea class="comment-input" placeholder="{{ translate("Write a reply...") }}"></textarea>
+                    <button class="send-comment-button">{{ translate("Reply") }}</button>
+                </div>
+            </div>
+        </div>
+    </li>
+</template>

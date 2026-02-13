@@ -1,11 +1,13 @@
 // Main javascript
 // noinspection DuplicatedCode
 
-import autocomplete, {AutocompleteItem} from "autocompleter"
+import autocomplete, { AutocompleteItem } from "autocompleter"
 import micromodal from "micromodal"
+import "./comments"
+import { initAuth } from "./auth"
 
 // var defined in layout.twig
-type Globals = {
+export type Globals = {
     autocomplete: string
     search: string
     model: string
@@ -28,12 +30,25 @@ type Globals = {
     trade_template: string
     thumb_rotate_delay: number
     under: string
+    auth_url: string
 }
 
 // Doing everything after html loaded.
 document.addEventListener("DOMContentLoaded", function () {
     // globals is the object containing some vars defined in layout.twig
     const globals = (window as any).globals as Globals
+    initAuth(globals.auth_url)
+    // Add global indexes to thumb links if not already present
+    const firstThumbLink = document.querySelector(".thumbs a.thumb-link")
+    if (firstThumbLink && !firstThumbLink.hasAttribute("data-index")) {
+        let globalIndex = 0
+        document.querySelectorAll(".thumbs a.thumb-link").forEach(link => {
+            if (!link.hasAttribute("data-index")) {
+                link.setAttribute("data-index", globalIndex.toString())
+                globalIndex++
+            }
+        })
+    }
     // prevent default action on dropdown anchors
     document.querySelectorAll(".dropdown > a").forEach(el =>
         el.addEventListener("click", e => e.preventDefault()),
@@ -130,7 +145,7 @@ document.addEventListener("DOMContentLoaded", function () {
                             .replace("{route}", globals.autocomplete)
                     }
                     try {
-                        const res = await fetch(`${autocompleteUrl}?q=${encodeURIComponent(text)}`, {signal})
+                        const res = await fetch(`${autocompleteUrl}?q=${encodeURIComponent(text)}`, { signal })
                         const json = await res.json()
                         update(json)
                     } catch (err) {
@@ -228,6 +243,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 const contentId = clickedAnchor.getAttribute("data-id")
                 const categoryId = clickedAnchor.getAttribute("data-category-id") || ""
                 const thumbId = clickedAnchor.getAttribute("data-thumb-id") || "-1"
+                const position = clickedAnchor.getAttribute("data-index") || "-1"
                 const newWindow = clickedAnchor.getAttribute("data-target") === "_blank"
                 const type = globals.page_template === "top-categories" ? "tca" : globals.page_template === "top-content" ? "tc" :
                     globals.page_template == "category" ? "c" : ""
@@ -236,11 +252,13 @@ document.addEventListener("DOMContentLoaded", function () {
                     cid: categoryId,
                     id: contentId,
                     tid: thumbId,
+                    pos: position,
                 })
                 let url = href
                 if (globals.trade) {
                     url = globals.trade_template.replace(/{{\s*encoded_url\s*}}/, encodeURIComponent(url))
                         .replace(/{{\s*url\s*}}/, url)
+                        .replace(/{{\s*lang\s*}}/, globals.lang)
                 }
                 if (newWindow) {
                     let countUrl = globals.out + "?" + params.toString()
@@ -409,58 +427,268 @@ document.addEventListener("DOMContentLoaded", function () {
             micromodal.show("dmca")
         })
     })
-    // Thumb rotation script
-    let currentlyPreloadingImage
-    document.querySelectorAll(".thumb picture[data-thumb-number]").forEach(el => {
-        const thumbsAmount = parseInt(el.getAttribute("data-amount"))
-        if (thumbsAmount > 0) {
-            const origThumbNumber = parseInt(el.getAttribute("data-thumb-number"))
-            let currentThumbNumber = origThumbNumber
-            const sourceElement = el.querySelector("source")
-            const imgElement = el.querySelector("img") as HTMLImageElement
-            const srcTemplate = imgElement.src.replace(/\.(\d+)\.(webp|jpg|png)$/, ".%d.$2")
-            const isRetina = sourceElement.srcset.includes("@2x.")
-            let timeoutId
-            el.addEventListener("mouseenter", e => {
-                if (timeoutId) {
-                    clearTimeout(timeoutId)
-                    timeoutId = null
+    // Unified thumb preview system (video preview + thumb rotation)
+    let currentlyPreloadingImage: HTMLImageElement | null = null
+    let activeVideoElement: HTMLVideoElement | null = null
+    let activeThumbRotation: {
+        element: Element
+        timeoutId: number | null
+        currentThumbNumber: number
+        origThumbNumber: number
+        srcTemplate: string
+        isRetina: boolean
+        thumbsAmount: number
+        sourceElement: HTMLSourceElement
+        imgElement: HTMLImageElement
+    } | null = null
+
+    // Helper functions
+    const stopAllPreviews = () => {
+        // Stop active video preview
+        if (activeVideoElement) {
+            activeVideoElement.pause()
+            activeVideoElement.currentTime = 0
+            const pictureEl = activeVideoElement.parentNode as HTMLElement
+            if (pictureEl) {
+                const imgEl = pictureEl.querySelector("img")
+                if (imgEl) imgEl.style.opacity = "1"
+                if (activeVideoElement.parentNode === pictureEl) {
+                    pictureEl.removeChild(activeVideoElement)
                 }
-                const preloadAndRotate = () => {
-                    currentlyPreloadingImage = document.createElement("img") as HTMLImageElement
-                    let newThumbNumber = currentThumbNumber + 1
-                    if (newThumbNumber >= thumbsAmount) newThumbNumber = 0
-                    const newSrc = srcTemplate.replace("%d", newThumbNumber.toString())
-                    currentlyPreloadingImage.setAttribute("src", newSrc)
-                    let loaded = false
-                    currentlyPreloadingImage.addEventListener("load", () => loaded = true)
-                    const doRotate = () => {
-                        if (!loaded) {
-                            timeoutId = setTimeout(doRotate, 200)
-                            return
-                        }
-                        imgElement.src = newSrc
-                        sourceElement.srcset = isRetina ? newSrc + ", " + newSrc.replace(/\.(jpg|webp|png)$/, "@2x.$1") + " 1.5x" : newSrc
-                        currentThumbNumber++
-                        if (currentThumbNumber >= thumbsAmount) currentThumbNumber = 0
-                        setTimeout(preloadAndRotate, 0)
-                    }
-                    timeoutId = setTimeout(doRotate, globals.thumb_rotate_delay)
-                }
-                preloadAndRotate()
-            })
-            el.addEventListener("mouseleave", e => {
-                if (timeoutId) {
-                    clearTimeout(timeoutId)
-                    timeoutId = null
-                }
-                // restoring original src and thumb number
-                currentThumbNumber = origThumbNumber
-                const origSrc = srcTemplate.replace("%d", currentThumbNumber.toString())
-                imgElement.src = origSrc
-                sourceElement.srcset = isRetina ? origSrc + ", " + origSrc.replace(/\.(jpg|webp|png)$/, "@2x.$1") + " 1.5x" : origSrc
-            })
+            }
+            activeVideoElement = null
         }
+
+        // Stop active thumb rotation
+        if (activeThumbRotation) {
+            if (activeThumbRotation.timeoutId) {
+                clearTimeout(activeThumbRotation.timeoutId)
+                activeThumbRotation.timeoutId = null
+            }
+            // Restore original thumb
+            const origSrc = activeThumbRotation.srcTemplate.replace("%d", activeThumbRotation.origThumbNumber.toString())
+            activeThumbRotation.imgElement.src = origSrc
+            activeThumbRotation.sourceElement.srcset = activeThumbRotation.isRetina ?
+                origSrc + ", " + origSrc.replace(/\.(jpg|webp|png)$/, "@2x.$1") + " 1.5x" : origSrc
+            activeThumbRotation = null
+        }
+    }
+
+    const createVideoElement = (previewUrl: string): HTMLVideoElement => {
+        const videoEl = document.createElement("video")
+        videoEl.src = previewUrl
+        videoEl.muted = true
+        videoEl.loop = true
+        videoEl.playsInline = true
+        videoEl.preload = "metadata"
+        videoEl.style.width = "100%"
+        videoEl.style.height = "100%"
+        videoEl.style.objectFit = "cover"
+        videoEl.style.position = "absolute"
+        videoEl.style.top = "0"
+        videoEl.style.left = "0"
+        videoEl.style.zIndex = "1"
+        return videoEl
+    }
+
+    const startVideoPreview = (thumbLink: Element) => {
+        const previewUrl = thumbLink.getAttribute("data-preview")
+        if (!previewUrl) return false
+
+        const pictureEl = thumbLink.querySelector("picture")
+        const imgEl = pictureEl?.querySelector("img") as HTMLImageElement
+        if (!imgEl || !pictureEl) return false
+
+        const videoEl = createVideoElement(previewUrl)
+        activeVideoElement = videoEl
+
+        pictureEl.style.position = "relative"
+        pictureEl.appendChild(videoEl)
+        imgEl.style.opacity = "0"
+
+        videoEl.play().catch(() => {
+            // Autoplay failed, but video is loaded
+        })
+
+        return true
+    }
+
+    const startThumbRotation = (pictureEl: Element) => {
+        const thumbsAmount = parseInt(pictureEl.getAttribute("data-amount") || "0")
+        if (thumbsAmount <= 1) return false
+
+        const origThumbNumber = parseInt(pictureEl.getAttribute("data-thumb-number") || "0")
+        const sourceElement = pictureEl.querySelector("source") as HTMLSourceElement
+        const imgElement = pictureEl.querySelector("img") as HTMLImageElement
+        const srcTemplate = imgElement.src.replace(/\.(\d+)\.(webp|jpg|png)$/, ".%d.$2")
+        const isRetina = sourceElement.srcset.includes("@2x.")
+
+        let currentThumbNumber = origThumbNumber
+        let timeoutId: number | null = null
+
+        activeThumbRotation = {
+            element: pictureEl,
+            timeoutId,
+            currentThumbNumber,
+            origThumbNumber,
+            srcTemplate,
+            isRetina,
+            thumbsAmount,
+            sourceElement,
+            imgElement
+        }
+
+        const preloadAndRotate = () => {
+            currentlyPreloadingImage = document.createElement("img")
+            let newThumbNumber = currentThumbNumber + 1
+            if (newThumbNumber >= thumbsAmount) newThumbNumber = 0
+            const newSrc = srcTemplate.replace("%d", newThumbNumber.toString())
+            currentlyPreloadingImage.setAttribute("src", newSrc)
+            let loaded = false
+            currentlyPreloadingImage.addEventListener("load", () => loaded = true)
+            const doRotate = () => {
+                if (!loaded) {
+                    timeoutId = window.setTimeout(doRotate, 200)
+                    return
+                }
+                if (activeThumbRotation && activeThumbRotation.element === pictureEl) {
+                    imgElement.src = newSrc
+                    sourceElement.srcset = isRetina ? newSrc + ", " + newSrc.replace(/\.(jpg|webp|png)$/, "@2x.$1") + " 1.5x" : newSrc
+                    currentThumbNumber++
+                    if (currentThumbNumber >= thumbsAmount) currentThumbNumber = 0
+                    activeThumbRotation.currentThumbNumber = currentThumbNumber
+                    activeThumbRotation.timeoutId = window.setTimeout(preloadAndRotate, globals.thumb_rotate_delay)
+                }
+            }
+            timeoutId = window.setTimeout(doRotate, globals.thumb_rotate_delay)
+            if (activeThumbRotation) {
+                activeThumbRotation.timeoutId = timeoutId
+            }
+        }
+        preloadAndRotate()
+
+        return true
+    }
+
+    // Event delegation on .thumbs container
+    document.querySelectorAll(".thumbs").forEach(thumbsContainer => {
+        let currentHoveredThumb: Element | null = null
+
+        const handleThumbHover = (thumb: Element) => {
+            if (thumb === currentHoveredThumb) return
+
+            currentHoveredThumb = thumb
+            stopAllPreviews()
+
+            const thumbLink = thumb.querySelector("a.thumb-link") as Element
+            if (!thumbLink) return
+
+            // Priority: video preview first, then thumb rotation
+            const hasVideoPreview = startVideoPreview(thumbLink)
+            if (!hasVideoPreview) {
+                const pictureEl = thumb.querySelector("picture[data-thumb-number]")
+                if (pictureEl) {
+                    startThumbRotation(pictureEl)
+                }
+            }
+        }
+
+        const handleMouseLeave = (e: MouseEvent) => {
+            const target = e.target as Element
+            const thumb = target.closest(".thumb") as Element
+            const relatedThumb = e.relatedTarget ? (e.relatedTarget as Element).closest(".thumb") : null
+
+            // Only stop if we're actually leaving the thumbs container entirely
+            if (thumb && !relatedThumb) {
+                currentHoveredThumb = null
+                stopAllPreviews()
+            }
+        }
+
+        // Handle mouseover on thumbs container (triggers for any thumb hover)
+        thumbsContainer.addEventListener("mouseover", (e: Event) => {
+            const target = e.target as Element
+            const thumb = target.closest(".thumb") as Element
+            if (thumb) {
+                handleThumbHover(thumb)
+            }
+        })
+
+        thumbsContainer.addEventListener("mouseleave", handleMouseLeave, true)
+
+        // Mobile touch and scroll handling
+        let touchStartThumb: Element | null = null
+
+        const handleTouchStart = (e: TouchEvent) => {
+            const target = e.target as Element
+            const thumb = target.closest(".thumb") as Element
+            if (!thumb) return
+
+            e.preventDefault()
+            touchStartThumb = thumb
+            stopAllPreviews()
+
+            const thumbLink = thumb.querySelector("a.thumb-link") as Element
+            if (thumbLink) {
+                const hasVideoPreview = startVideoPreview(thumbLink)
+                if (!hasVideoPreview) {
+                    const pictureEl = thumb.querySelector("picture[data-thumb-number]")
+                    if (pictureEl) {
+                        startThumbRotation(pictureEl)
+                    }
+                }
+            }
+        }
+
+        const handleTouchEnd = () => {
+            if (touchStartThumb) {
+                stopAllPreviews()
+                touchStartThumb = null
+            }
+        }
+
+        thumbsContainer.addEventListener("touchstart", handleTouchStart, { passive: false })
+        thumbsContainer.addEventListener("touchend", handleTouchEnd)
+
+        // Intersection Observer for scroll-based preview on mobile
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (window.innerWidth > 768) return // Only on mobile
+
+                const thumb = entry.target.closest(".thumb") as Element
+                if (!thumb) return
+
+                if (entry.isIntersecting) {
+                    // Only start preview if not already active and no touch in progress
+                    if (!activeVideoElement && !activeThumbRotation && !touchStartThumb) {
+                        const thumbLink = thumb.querySelector("a.thumb-link") as Element
+                        if (thumbLink) {
+                            const hasVideoPreview = startVideoPreview(thumbLink)
+                            if (!hasVideoPreview) {
+                                const pictureEl = thumb.querySelector("picture[data-thumb-number]")
+                                if (pictureEl) {
+                                    startThumbRotation(pictureEl)
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    // Stop preview only if it's for this thumb
+                    if ((activeVideoElement && activeVideoElement.closest(".thumb") === thumb) ||
+                        (activeThumbRotation && activeThumbRotation.element.closest(".thumb") === thumb)) {
+                        stopAllPreviews()
+                    }
+                }
+            })
+        }, {
+            threshold: 0.5,
+            rootMargin: '50px'
+        })
+
+        // Observe all thumbs in this container
+        thumbsContainer.querySelectorAll(".thumb").forEach(thumb => {
+            observer.observe(thumb)
+        })
     })
     // scroll to top functionality
     const backToTopBtn = document.querySelector("#back-to-top") as HTMLElement

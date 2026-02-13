@@ -6,7 +6,7 @@ function fetch_toplist(toplist_name, amount, onlyImg) {
         for (let i = 0; i < amount; i++) {
             let domain = faker.DomainName()
             let url = "https://" + domain
-            traders.push({domain: domain, name: faker.HipsterSentence(2), url: url})
+            traders.push({ domain: domain, name: faker.HipsterSentence(2), url: url })
         }
         return {
             "success": true,
@@ -46,6 +46,7 @@ function fetch_toplist(toplist_name, amount, onlyImg) {
         headers: headers,
         name: toplist_name,
         img: !!onlyImg,
+        lang: lang.Id,
         authorization: config.Custom.ttt_secret
     })
     if (out) {

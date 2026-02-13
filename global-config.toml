@@ -11,6 +11,8 @@ geoip_url = "https://totaltraffictrader.com/geo/country.tar.gz" # URL of geoip c
 development = true
 default_blackhole_route = "/blackhole" # Default route for blackhole to catch bad bots
 check_for_bots = true # Check for bots accessing blackhole routes and block them
+debug_route = "/_debug"
+AuthUrl = "http://localhost:8389/"
 
 [frontend]
 sites_path = "./sites"
@@ -23,4 +25,15 @@ captcha_whitelist = ["to@sersh.com"] # Whitelist of emails which doesn't need to
 
 [database]
 path = "./database"
+backup_path = "./database-backup"
 low_memory = true
+
+[mail]
+secure = true # Use SSL for SMTP
+port = 465 # Port for SMTP
+hostname = "smtp.gmail.com" # SMTP server hostname
+username = "" # SMTP username
+password = "" # SMTP password
+address_from = "" # From address
+address_reply = "" # Reply address
+timeout = 10 # Timeout for SMTP connection in seconds

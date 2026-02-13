@@ -6,6 +6,7 @@
   height: 50px;
   //opacity: 0.9;
   transition: all 0.3s ease;
+
   &:hover {
     transform: scale(1.04);
     opacity: 1;
@@ -44,12 +45,15 @@
     display: block;
   }
 }
+
 .header {
   background-color: $header-background-color;
   color: $header-text-color;
+
   .sorted-links {
     width: 100%;
     float: left;
+
     a {
       color: $header-text-color
     }
@@ -77,7 +81,8 @@
         border-bottom-left-radius: 5px;
       }
 
-      &:hover, &.active {
+      &:hover,
+      &.active {
         background-color: lighten($header-background-color, 11%);
       }
 
@@ -90,6 +95,7 @@
       float: right;
       margin-left: 10px;
       padding: 5px 0;
+
       @media only screen and (max-width: 800px) {
         // for this resolution move lang select to the left
         float: left;
@@ -97,6 +103,7 @@
       }
     }
   }
+
   // Language selection styles
   @if $multiLang {
     .language-select {
@@ -104,21 +111,26 @@
       column-width: 130px;
       width: 600px;
       padding: 8px;
+
       @media only screen and (max-width: 600px) {
         width: 100%;
+
         .dropdown {
           position: static;
         }
       }
     }
+
     .language-select-btn {
       &:hover {
-        .nav-flag > i:before {
+        .nav-flag>i:before {
           display: inline-block;
           transform: rotate(90deg);
         }
       }
-      img { // language flag icon
+
+      img {
+        // language flag icon
         width: 26px;
         height: 26px;
         vertical-align: middle;
@@ -135,9 +147,15 @@
       }
 
       @media only screen and (max-width: 800px) {
-        a.nav-flag > span {
+        a.nav-flag>span {
           display: none;
         }
+      }
+    }
+
+    @media only screen and (max-width: 800px) {
+      a.nav-flag>span {
+        display: none;
       }
     }
   }
@@ -154,16 +172,19 @@
     flex-basis: 700px;
     max-width: 700px;
     min-width: 200px;
+
     .icon-search {
       padding: 8px 12px 8px 12px;
       font-size: 1.1em;
     }
+
     form {
       display: flex;
       flex-wrap: nowrap;
       justify-content: space-around;
       justify-items: center;
     }
+
     input[type=search] {
       height: 40px;
       vertical-align: middle;
@@ -174,11 +195,13 @@
       border: 1px solid darken($header-text-color, 13%);
       color: $header-text-color;
       background-color: transparent;
+
       &::placeholder {
         color: $header-text-color;
         opacity: 0.4;
       }
     }
+
     button[type=submit] {
       color: $header-text-color;
       background-color: transparent;

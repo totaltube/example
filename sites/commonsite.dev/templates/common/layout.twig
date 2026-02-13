@@ -7,8 +7,6 @@
     <meta name="RATING" content="RTA-5042-1996-1400-1577-RTA">
     <meta name="referrer" content="unsafe-url">
     <meta name="theme-color" content="#ffffff">
-    <script defer
-            src="https://polyfill.io/v3/polyfill.min.js?features=IntersectionObserver,Promise,String.prototype.startsWith,String.prototype.includes,document.querySelector,NodeList.prototype.forEach,Array.prototype.forEach,Array.prototype.values,Element.prototype.closest,Element.prototype.classList,Element.prototype.remove,fetch|gated&flags=gated"></script>
     {% canonical %}
     {% alternates %}
     {% prevnext %}
@@ -36,7 +34,8 @@
             captcha_key: '{{ global_config.Frontend.CaptchaKey | safe }}',
             page_template: '{{ page_template }}',
             trade_template: '{{ config.General.TradeUrlTemplate }}',
-            thumb_rotate_delay: parseInt('{{ config.Custom.thumb_rotate_delay }}')
+            thumb_rotate_delay: parseInt('{{ config.Custom.thumb_rotate_delay }}'),
+            auth_url: '{{ config.General.AuthUrl }}'
         }
     </script>
     {% dynamic insert_ttt() | safe %}

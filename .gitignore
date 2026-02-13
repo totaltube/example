@@ -6,7 +6,6 @@ yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
 .idea
-sites/commonsite.dev/public/
 node_modules
 *.exe
 database-backup
