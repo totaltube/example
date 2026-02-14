@@ -201,6 +201,16 @@ $comments-count-font-size: $font-size-smaller;
       font-weight: 700;
     }
 
+    .delete-button {
+      font-weight: 700;
+      color: #c0392b;
+
+      &:hover {
+        background-color: rgba(#c0392b, 0.1);
+        color: darken(#c0392b, 10%);
+      }
+    }
+
     .comment-permalink {
       color: $comments-muted;
       text-decoration: none;
@@ -263,6 +273,20 @@ $comments-count-font-size: $font-size-smaller;
         background-color: darken($comments-primary, 10%);
       }
     }
+  }
+}
+
+.comment-container.comment-deleted {
+  opacity: 0.6;
+  border-style: dashed;
+
+  .comment-text {
+    font-style: italic;
+    color: $comments-muted;
+  }
+
+  .comment-username {
+    color: $comments-muted;
   }
 }
 

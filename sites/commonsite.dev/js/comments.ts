@@ -14,11 +14,59 @@ document.addEventListener("DOMContentLoaded", () => {
     const i18nNoComments = commentsSection?.getAttribute("data-i18n-no-comments") || "No comments yet."
     const i18nMoreReplies = commentsSection?.getAttribute("data-i18n-more-replies") || "More {count} replies"
     const i18nLoading = commentsSection?.getAttribute("data-i18n-loading") || "Loading..."
+    const i18nCommentDeleted = commentsSection?.getAttribute("data-i18n-comment-deleted") || "Comment deleted"
+    const i18nDeleteConfirm = commentsSection?.getAttribute("data-i18n-delete-confirm") || "Delete this comment?"
     const currentSiteId = toNumber(commentsSection?.getAttribute("data-site-id"), 0)
     const INITIAL_VISIBLE_REPLIES = 2
     const LOAD_MORE_BATCH = 5
     const MAX_INDENT = 9
     const MAX_SIBLINGS = 1000
+
+    function parseJwt(token: string): Record<string, any> | null {
+        try {
+            const base64Url = token.split('.')[1]
+            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/')
+            const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function (c) {
+                return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
+            }).join(''))
+            return JSON.parse(jsonPayload)
+        } catch {
+            return null
+        }
+    }
+
+    function getCurrentUserId(): number {
+        const token = getStoredAuthToken()
+        if (!token) return 0
+        const payload = parseJwt(token)
+        if (!payload) return 0
+        // Try common JWT user_id fields: user_id, sub, id
+        return toNumber(payload.user_id ?? payload.sub ?? payload.id, 0)
+    }
+
+    function getCurrentUserEmail(): string {
+        const token = getStoredAuthToken()
+        if (!token) return ""
+        const payload = parseJwt(token)
+        if (!payload) return ""
+        return String(payload.email ?? "").trim().toLowerCase()
+    }
+
+    function isCurrentUserAdmin(): boolean {
+        const adminEmailsJson = commentsSection?.getAttribute("data-admin-emails") || "[]"
+        let adminEmails: string[] = []
+        try {
+            adminEmails = JSON.parse(adminEmailsJson)
+        } catch {
+            adminEmails = []
+        }
+        if (!Array.isArray(adminEmails) || adminEmails.length === 0) return false
+        
+        const currentEmail = getCurrentUserEmail()
+        if (!currentEmail) return false
+        
+        return adminEmails.some(email => email.trim().toLowerCase() === currentEmail)
+    }
 
     // Helper to find parent comment container
     function getCommentContainer(el: Element): Element | null {
@@ -130,6 +178,8 @@ document.addEventListener("DOMContentLoaded", () => {
         Dislikes: number
         IsLiked: boolean
         IsDisliked: boolean
+        Status: string
+        UserId: number
     }
 
     type RawComment = Record<string, any>
@@ -155,6 +205,8 @@ document.addEventListener("DOMContentLoaded", () => {
             Dislikes: toNumber(raw?.Dislikes ?? raw?.dislikes ?? fallback.Dislikes, 0),
             IsLiked: Boolean(raw?.IsLiked ?? raw?.is_liked ?? fallback.IsLiked),
             IsDisliked: Boolean(raw?.IsDisliked ?? raw?.is_disliked ?? fallback.IsDisliked),
+            Status: String(raw?.Status ?? raw?.status ?? fallback.Status ?? "approved"),
+            UserId: toNumber(raw?.UserId ?? raw?.user_id ?? fallback.UserId, 0),
         }
     }
 
@@ -179,18 +231,25 @@ document.addEventListener("DOMContentLoaded", () => {
         container.setAttribute("data-parent-id", (comment.ParentId || 0).toString())
         container.setAttribute("data-reply-count", toNumber(comment.ReplyCount, 0).toString())
         container.setAttribute("data-indent", comment.Indent.toString())
+        container.setAttribute("data-status", comment.Status || "approved")
+        container.setAttribute("data-user-id", (comment.UserId || 0).toString())
         container.style.setProperty("--comment-indent", comment.Indent.toString())
         container.classList.toggle("is-reply", comment.ParentId > 0)
 
+        const isDeleted = comment.Status === "deleted"
+        if (isDeleted) {
+            container.classList.add("comment-deleted")
+        }
+
         const avatarImg = container.querySelector(".avatar img") as HTMLImageElement
-        if (comment.Avatar) {
+        if (!isDeleted && comment.Avatar) {
             avatarImg.src = comment.Avatar
             avatarImg.alt = comment.Username
         } // else placeholder is already there
 
-        container.querySelector(".comment-username")!.textContent = comment.Username
+        container.querySelector(".comment-username")!.textContent = isDeleted ? "" : comment.Username
         const contextEl = container.querySelector(".comment-context") as HTMLElement
-        if (comment.ParentId > 0) {
+        if (comment.ParentId > 0 && !isDeleted) {
             const replyToName = resolveReplyUsername(comment)
             if (replyToName) {
                 container.setAttribute("data-reply-to-username", replyToName)
@@ -208,33 +267,49 @@ document.addEventListener("DOMContentLoaded", () => {
             contextEl.classList.add("hidden")
         }
 
-        container.querySelector(".comment-text")!.textContent = comment.Text
-        const permalink = container.querySelector(".comment-permalink") as HTMLAnchorElement
-        permalink.href = `#comment-${domCommentId}`
-        permalink.textContent = "#"
+        container.querySelector(".comment-text")!.textContent = isDeleted ? i18nCommentDeleted : comment.Text
 
-        const likeBtn = container.querySelector(".like-button") as HTMLElement
-        if (comment.IsLiked) likeBtn.classList.add("active")
+        const actionsEl = container.querySelector(".comment-actions") as HTMLElement
+        const replyBoxEl = container.querySelector(".comment-reply") as HTMLElement
 
-        const scoreCount = container.querySelector(".score-count") as HTMLElement
-        if (scoreCount) {
-            scoreCount.textContent = (comment.Likes - comment.Dislikes).toString()
-        }
+        if (isDeleted) {
+            // Hide actions and reply box for deleted comments
+            if (actionsEl) actionsEl.classList.add("hidden")
+            if (replyBoxEl) replyBoxEl.classList.add("hidden")
+        } else {
+            const permalink = container.querySelector(".comment-permalink") as HTMLAnchorElement
+            permalink.href = `#comment-${domCommentId}`
+            permalink.textContent = "#"
 
-        const dislikeBtn = container.querySelector(".dislike-button") as HTMLElement
-        if (comment.IsDisliked) dislikeBtn.classList.add("active")
+            const likeBtn = container.querySelector(".like-button") as HTMLElement
+            if (comment.IsLiked) likeBtn.classList.add("active")
 
-        const replyBtn = container.querySelector(".reply-button") as HTMLElement
-        if (replyBtn) {
-            // Hide reply button if indent is too deep OR if comment is from another site
-            // If currentSiteId is 0 (not found), we allow replying (assuming monolithic/simple setup)
-            // unless we want to be strict. Let's be consistent with template logic.
-            const isCrossSite = currentSiteId > 0 && comment.SiteId > 0 && comment.SiteId !== currentSiteId
+            const scoreCount = container.querySelector(".score-count") as HTMLElement
+            if (scoreCount) {
+                scoreCount.textContent = (comment.Likes - comment.Dislikes).toString()
+            }
 
-            if (comment.Indent >= MAX_INDENT || isCrossSite) {
-                replyBtn.classList.add("hidden")
-                // Also hide the whole reply box container if it exists
-                container.querySelector(".comment-reply")?.classList.add("hidden")
+            const dislikeBtn = container.querySelector(".dislike-button") as HTMLElement
+            if (comment.IsDisliked) dislikeBtn.classList.add("active")
+
+            const replyBtn = container.querySelector(".reply-button") as HTMLElement
+            if (replyBtn) {
+                const isCrossSite = currentSiteId > 0 && comment.SiteId > 0 && comment.SiteId !== currentSiteId
+                if (comment.Indent >= MAX_INDENT || isCrossSite) {
+                    replyBtn.classList.add("hidden")
+                    container.querySelector(".comment-reply")?.classList.add("hidden")
+                }
+            }
+
+            // Show delete button if user owns this comment or is admin
+            const deleteBtn = container.querySelector(".delete-button") as HTMLElement
+            if (deleteBtn) {
+                const currentUserId = getCurrentUserId()
+                const isOwner = currentUserId > 0 && comment.UserId > 0 && currentUserId === comment.UserId
+                const isAdmin = isCurrentUserAdmin()
+                if (isOwner || isAdmin) {
+                    deleteBtn.classList.remove("hidden")
+                }
             }
         }
 
@@ -548,7 +623,10 @@ document.addEventListener("DOMContentLoaded", () => {
                     commentsList!.innerHTML = `<li><p>${i18nNoComments}</p></li>`
                 } else {
                     for (const raw of mergedItems) {
-                        commentsList!.appendChild(renderComment(normalizeComment(raw)))
+                        const comment = normalizeComment(raw)
+                        // Skip deleted comments with no descendants
+                        if (comment.Status === "deleted" && comment.ReplyCount <= 0) continue
+                        commentsList!.appendChild(renderComment(comment))
                     }
                     collapseInitialReplies()
                 }
@@ -628,6 +706,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 for (const raw of json.items) {
                     const normalized = normalizeComment(raw, { ParentId: parentId })
                     if (normalized.CommentId > 0 && known.has(normalized.CommentId.toString())) {
+                        continue
+                    }
+                    // Skip deleted comments with no descendants
+                    if (normalized.Status === "deleted" && normalized.ReplyCount <= 0) {
                         continue
                     }
                     const newEl = renderComment(normalized)
@@ -762,6 +844,87 @@ document.addEventListener("DOMContentLoaded", () => {
                 const input = replyBox.querySelector("textarea") as HTMLTextAreaElement
                 if (input) input.focus()
             }
+        }
+    })
+
+    // Delete Button
+    document.body.addEventListener("click", async (e) => {
+        const target = getEventTargetElement(e.target)
+        if (!target) return
+        if (!target.closest(".delete-button")) return
+        e.preventDefault()
+
+        const btn = target.closest(".delete-button") as HTMLButtonElement
+        const container = getCommentContainer(btn)
+        if (!container) return
+
+        const commentId = container.getAttribute("data-comment-id")
+        if (!commentId || commentId === "0") return
+
+        if (!confirm(i18nDeleteConfirm)) return
+
+        btn.disabled = true
+        try {
+            const headers: HeadersInit = { "Content-Type": "application/json" }
+            const token = getStoredAuthToken()
+            if (token) {
+                headers["X-Comment-Token"] = token
+            }
+
+            await requestJsonWithAuthRetry(`${endpoint}/delete?comment_id=${commentId}`, {
+                method: "POST",
+                headers: headers,
+            })
+
+            // Successfully deleted - update the UI
+            const replyCount = toNumber(container.getAttribute("data-reply-count"), 0)
+            if (replyCount > 0) {
+                // Comment has children - show as deleted placeholder
+                container.classList.add("comment-deleted")
+                container.setAttribute("data-status", "deleted")
+                const textEl = container.querySelector(".comment-text")
+                if (textEl) textEl.textContent = i18nCommentDeleted
+                const usernameEl = container.querySelector(".comment-username")
+                if (usernameEl) usernameEl.textContent = ""
+                const contextEl = container.querySelector(".comment-context")
+                if (contextEl) {
+                    contextEl.textContent = ""
+                    contextEl.classList.add("hidden")
+                }
+                const actionsEl = container.querySelector(".comment-actions")
+                if (actionsEl) (actionsEl as HTMLElement).classList.add("hidden")
+                const replyBoxEl = container.querySelector(".comment-reply")
+                if (replyBoxEl) (replyBoxEl as HTMLElement).classList.add("hidden")
+                // Reset avatar to placeholder
+                const avatarImg = container.querySelector(".avatar img") as HTMLImageElement
+                if (avatarImg) avatarImg.src = "/images/avatar_placeholder.png"
+            } else {
+                // No children - remove the comment element entirely
+                const li = container.closest("li")
+                if (li) {
+                    // Update parent's reply count if this was a reply
+                    const parentId = toNumber(container.getAttribute("data-parent-id"), 0)
+                    if (parentId > 0) {
+                        const parentContainer = document.querySelector(`.comment-container[data-comment-id="${parentId}"]`) as HTMLElement | null
+                        if (parentContainer) {
+                            const parentReplyCount = toNumber(parentContainer.getAttribute("data-reply-count"), 0)
+                            if (parentReplyCount > 0) {
+                                parentContainer.setAttribute("data-reply-count", (parentReplyCount - 1).toString())
+                            }
+                            const parentLi = parentContainer.closest("li")
+                            if (parentLi) {
+                                updateMoreRepliesControl(parentLi, parentContainer)
+                            }
+                        }
+                    }
+                    li.remove()
+                }
+            }
+        } catch (err) {
+            console.error("Failed to delete comment", err)
+            alert(String(err instanceof Error ? err.message : "Error deleting comment"))
+        } finally {
+            btn.disabled = false
         }
     })
 

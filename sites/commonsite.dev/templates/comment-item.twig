@@ -1,3 +1,4 @@
+{% if comment.Status != "deleted" or comment.ReplyCount > 0 %}
 <li>
     {% set reply_to_name = comment.ReplyToUsername %}
     {% if not reply_to_name and comment.ParentId > 0 and comments and comments.Items %}
@@ -7,27 +8,30 @@
             {% endif %}
         {% endfor %}
     {% endif %}
+    {% set is_deleted = comment.Status == "deleted" %}
     <div
-        class="comment-container{% if comment.ParentId > 0 %} is-reply{% endif %}"
+        class="comment-container{% if comment.ParentId > 0 %} is-reply{% endif %}{% if is_deleted %} comment-deleted{% endif %}"
         id="comment-{{ comment.CommentId }}"
         data-comment-id="{{ comment.CommentId }}"
         data-parent-id="{{ comment.ParentId }}"
         data-reply-count="{{ comment.ReplyCount }}"
         data-reply-to-username="{{ reply_to_name }}"
         data-indent="{{ comment.Indent }}"
+        data-status="{{ comment.Status }}"
+        data-user-id="{{ comment.UserId }}"
         style="--comment-indent: {{ comment.Indent }};"
     >
         <div class="avatar">
-            {% if comment.Avatar %}
+            {% if not is_deleted and comment.Avatar %}
                 <img src="{{ comment.Avatar }}" alt="{{ comment.Username }}">
             {% else %}
                 <img src="/images/avatar_placeholder.png" alt="User Avatar">
             {% endif %}
         </div>
         <div class="comment-content">
-            <span class="comment-username">{{ comment.Username }}</span>
+            <span class="comment-username">{% if is_deleted %}{{ translate("Deleted") }}{% else %}{{ comment.Username }}{% endif %}</span>
             <div class="comment-context{% if comment.ParentId <= 0 %} hidden{% endif %}">
-                {% if comment.ParentId > 0 %}
+                {% if comment.ParentId > 0 and not is_deleted %}
                     {% if reply_to_name %}
                         {{ translate("Replying to") }}
                         <a class="comment-parent-link" href="#comment-{{ comment.ParentId }}">@{{ reply_to_name }}</a>
@@ -37,7 +41,8 @@
                     {% endif %}
                 {% endif %}
             </div>
-            <div class="comment-text">{{ comment.Text }}</div>
+            <div class="comment-text">{% if is_deleted %}{{ translate("Comment deleted") }}{% else %}{{ comment.Text }}{% endif %}</div>
+            {% if not is_deleted %}
             <div class="comment-actions">
                 <button class="like-button {% if comment.IsLiked %}active{% endif %}" aria-label="{{ translate("Like") }}">
                     <span class="c-icon"></span>
@@ -49,12 +54,15 @@
                 {% set current_site_id = config.SiteId %}
                 {% set is_cross_site = current_site_id > 0 and comment.SiteId > 0 and comment.SiteId != current_site_id %}
                 <button class="reply-button {% if comment.Indent >= 10 or is_cross_site %}hidden{% endif %}">{{ translate("Reply") }}</button>
+                <button class="delete-button hidden">{{ translate("Delete") }}</button>
                 <a class="comment-permalink" href="#comment-{{ comment.CommentId }}" aria-label="Comment link">#</a>
             </div>
             <div class="comment-reply {% if comment.Indent >= 10 or is_cross_site %}hidden{% endif %}">
                 <textarea class="comment-input" placeholder="{{ translate("Write a reply...") }}"></textarea>
                 <button class="send-comment-button">{{ translate("Reply") }}</button>
             </div>
+            {% endif %}
         </div>
     </div>
 </li>
+{% endif %}

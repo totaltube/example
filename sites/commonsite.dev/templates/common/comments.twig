@@ -15,6 +15,9 @@
         data-i18n-no-comments="{{ translate("No comments yet.") }}"
         data-i18n-more-replies="{{ translate("More {count} replies") }}"
         data-i18n-loading="{{ translate("Loading...") }}"
+        data-i18n-comment-deleted="{{ translate("Comment deleted") }}"
+        data-i18n-delete-confirm="{{ translate("Delete this comment?") }}"
+        data-admin-emails="{{ internal.Config.Comments.AdminEmails|json_encode|escape('html_attr') }}"
     >
         <ul>
         {% if comments.HotItems or comments.Items %}
@@ -53,7 +56,7 @@
 
 <template id="comment-template-js">
     <li>
-        <div class="comment-container" id="" data-comment-id="" data-parent-id="0" data-reply-count="0" data-indent="0" style="--comment-indent: 0;">
+        <div class="comment-container" id="" data-comment-id="" data-parent-id="0" data-reply-count="0" data-indent="0" data-status="" data-user-id="0" style="--comment-indent: 0;">
             <div class="avatar">
                 <img src="/images/avatar_placeholder.png" alt="User Avatar">
             </div>
@@ -70,6 +73,7 @@
                         <span class="c-icon"></span>
                     </button>
                     <button class="reply-button">{{ translate("Reply") }}</button>
+                    <button class="delete-button hidden">{{ translate("Delete") }}</button>
                     <a class="comment-permalink" href="#" aria-label="Comment link">#</a>
                 </div>
                 <div class="comment-reply">
