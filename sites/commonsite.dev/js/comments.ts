@@ -44,29 +44,8 @@ document.addEventListener("DOMContentLoaded", () => {
         return toNumber(payload.user_id ?? payload.sub ?? payload.id, 0)
     }
 
-    function getCurrentUserEmail(): string {
-        const token = getStoredAuthToken()
-        if (!token) return ""
-        const payload = parseJwt(token)
-        if (!payload) return ""
-        return String(payload.email ?? "").trim().toLowerCase()
-    }
-
-    function isCurrentUserAdmin(): boolean {
-        const adminEmailsJson = commentsSection?.getAttribute("data-admin-emails") || "[]"
-        let adminEmails: string[] = []
-        try {
-            adminEmails = JSON.parse(adminEmailsJson)
-        } catch {
-            adminEmails = []
-        }
-        if (!Array.isArray(adminEmails) || adminEmails.length === 0) return false
-        
-        const currentEmail = getCurrentUserEmail()
-        if (!currentEmail) return false
-        
-        return adminEmails.some(email => email.trim().toLowerCase() === currentEmail)
-    }
+    // Global admin state, updated from API responses
+    let isCurrentUserAdminFlag = false
 
     // Helper to find parent comment container
     function getCommentContainer(el: Element): Element | null {
@@ -306,7 +285,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (deleteBtn) {
                 const currentUserId = getCurrentUserId()
                 const isOwner = currentUserId > 0 && comment.UserId > 0 && currentUserId === comment.UserId
-                const isAdmin = isCurrentUserAdmin()
+                const isAdmin = isCurrentUserAdminFlag
                 if (isOwner || isAdmin) {
                     deleteBtn.classList.remove("hidden")
                 }
@@ -614,6 +593,7 @@ document.addEventListener("DOMContentLoaded", () => {
             )
             const json = await res.json()
             if (json.success && json.items) {
+                isCurrentUserAdminFlag = Boolean(json.is_admin)
                 commentsList!.innerHTML = ""; // Clear cached comments
                 const mergedItems = [
                     ...(Array.isArray(json.hot_items) ? json.hot_items : []),
