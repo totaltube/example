@@ -17,7 +17,6 @@
         data-i18n-loading="{{ translate("Loading...") }}"
         data-i18n-comment-deleted="{{ translate("Comment deleted") }}"
         data-i18n-delete-confirm="{{ translate("Delete this comment?") }}"
-        data-admin-emails="{{ internal.Config.Comments.AdminEmails|json_encode|escape('html_attr') }}"
     >
         <ul>
         {% if comments.HotItems or comments.Items %}
