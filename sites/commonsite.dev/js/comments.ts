@@ -450,11 +450,12 @@ function collapseInitialReplies() {
     })
 }
 
-function focusNewComment(li: HTMLElement) {
+function focusNewComment(li: HTMLElement, shouldUpdateHash: boolean = false) {
     const container = $(".comment-container", li)
     if (!container?.id) return
     const hash = `#${container.id}`
-    if (window.location.hash !== hash) window.history.replaceState({}, document.title, hash)
+    // console.log("focusNewComment", { hash, shouldUpdateHash, currentHash: window.location.hash })
+    if (shouldUpdateHash && window.location.hash !== hash) window.history.replaceState({}, document.title, hash)
     container.setAttribute("tabindex", "-1")
     container.scrollIntoView({ behavior: "smooth", block: "center" })
     try { container.focus({ preventScroll: true }) } catch { container.focus() }
@@ -532,8 +533,6 @@ async function loadComments(contentId: string | null, from = 0) {
         if (json.current_user_id > 0) {
             currentMinionUserId = toNum(json.current_user_id)
             console.log("[comments] Got current_user_id from API:", currentMinionUserId)
-            // Re-apply disabled state for SSR comments once exact minion user_id is known
-            disableOwnCommentReactions()
         }
         commentsTotalCount = json.total || 0
 
@@ -554,9 +553,7 @@ async function loadComments(contentId: string | null, from = 0) {
             collapseInitialReplies()
         }
 
-        // Fix z-indices and own comment states for all items
-        disableOwnCommentReactions()
-
+        refreshLayout()
         revealCommentsList()
     } catch (e) {
         console.error("Failed to load comments", e)
@@ -662,6 +659,7 @@ function insertCommentsBatch(items: any[]) {
     } else {
         collapseInitialReplies()
     }
+    refreshLayout()
 }
 
 async function hydrateFromHashContext(contentId: string | null) {
@@ -671,7 +669,7 @@ async function hydrateFromHashContext(contentId: string | null) {
 
     const existing = $(`#comment-${targetId}`)?.closest("li") as HTMLElement | null
     if (existing) {
-        focusNewComment(existing)
+        focusNewComment(existing, false)
         return
     }
 
@@ -703,7 +701,7 @@ async function hydrateFromHashContext(contentId: string | null) {
         revealCommentPath(targetId)
 
         const target = $(`#comment-${targetId}`)?.closest("li") as HTMLElement | null
-        if (target) focusNewComment(target)
+        if (target) focusNewComment(target, false)
     } catch (err) {
         console.error("Failed to hydrate comments context by hash", err)
     }
@@ -770,8 +768,8 @@ async function loadMoreReplies(parentId: number, parentLi: HTMLElement, parentCo
         }
 
         updateMoreRepliesControl(parentLi, parentContainer)
-        disableOwnCommentReactions() // Update z-indices so new replies sit behind parents
-        if (focusTarget) focusNewComment(focusTarget)
+        refreshLayout()
+        if (focusTarget) focusNewComment(focusTarget, false)
     } catch (err) {
         console.error("Failed to load more replies", err)
         moreBtn.textContent = prevText
@@ -781,31 +779,14 @@ async function loadMoreReplies(parentId: number, parentLi: HTMLElement, parentCo
     }
 }
 
-// Keep like/dislike visible but inactive for own comments on SSR-rendered content
-function disableOwnCommentReactions() {
-    const currentUserId = getCurrentUserId()
-    const allComments = $$(".comment-container[data-user-id]")
 
+function refreshLayout() {
+    const allComments = $$(".comment-container[data-comment-id]")
     // Reverse z-index: higher index for earlier comments so they cover the lines of later comments
     const baseZIndex = 10000
     allComments.forEach((container, i) => {
         container.style.zIndex = String(baseZIndex - i)
-
-        if (currentUserId <= 0) return
-        const commentUserId = toNum(container.dataset.userId)
-        if (commentUserId > 0 && commentUserId === currentUserId) {
-            container.classList.add("own-comment")
-            const likeBtn = $(".like-button", container) as HTMLButtonElement | null
-            const dislikeBtn = $(".dislike-button", container) as HTMLButtonElement | null
-            likeBtn?.classList.add("is-disabled")
-            dislikeBtn?.classList.add("is-disabled")
-            if (likeBtn) likeBtn.disabled = true
-            if (dislikeBtn) dislikeBtn.disabled = true
-        }
     })
-
-    // Also update thread lines since layout might have changed or new comments added
-    // Use requestAnimationFrame to ensure layout is settled (though usually it is sync)
     requestAnimationFrame(updateThreadLines)
 }
 
@@ -841,34 +822,15 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!section || !list) return
 
     const contentId = attr(section, "data-content-id")
-    const hasServerComments = !!$(".comment-container", list)
-    const ssrCommentPage = toNum(section.dataset.commentPage, 1)
-    const ssrCommentsTotal = toNum(section.dataset.commentsTotal, 0)
-    const pageSize = Math.max(1, Math.min(100, toNum(section.dataset.size, 50)))
 
-    // Keep reactions visible but inactive for own comments on page load
-    disableOwnCommentReactions()
-
-    if (hasServerComments) {
-        // Keep SSR comments, do not re-render from page start to avoid flicker/CLS
-        commentsLoadedFrom = (ssrCommentPage - 1) * pageSize + (list.querySelectorAll(":scope > li").length)
-        commentsTotalCount = ssrCommentsTotal
-        if (commentsLoadedFrom >= commentsTotalCount) allCommentsLoaded = true
-
-        // Initialize thread controls for SSR comments (load-more replies button, collapsed replies state)
-        collapseInitialReplies()
-        revealCommentsList()
-        void hydrateFromHashContext(contentId)
-    } else {
-        const observer = new IntersectionObserver(entries => {
-            if (entries[0].isIntersecting) {
-                observer.disconnect()
-                loadComments(contentId)
-                void hydrateFromHashContext(contentId)
-            }
-        })
-        observer.observe(section)
-    }
+    const observer = new IntersectionObserver(entries => {
+        if (entries[0].isIntersecting) {
+            observer.disconnect()
+            loadComments(contentId)
+            void hydrateFromHashContext(contentId)
+        }
+    })
+    observer.observe(section)
 
     if (sentinel) {
         const scrollRoot = $(".comments-wrapper")
@@ -1059,7 +1021,7 @@ document.addEventListener("DOMContentLoaded", () => {
                                 const count = toNum(parentContainer.dataset.replyCount)
                                 parentContainer.dataset.replyCount = String(count + 1)
                                 updateMoreRepliesControl(parentLi, parentContainer)
-                                focusNewComment(el)
+                                focusNewComment(el, true)
                                 $(".comment-reply", parentContainer)?.classList.remove("active")
                             }
                         }
@@ -1069,7 +1031,7 @@ document.addEventListener("DOMContentLoaded", () => {
                             const firstLi = $("li", list)
                             if (firstLi && !$(".comment-container", firstLi)) firstLi.remove()
                             list.insertAdjacentElement("afterbegin", el)
-                            focusNewComment(el)
+                            focusNewComment(el, true)
                         }
                     }
                 } else {

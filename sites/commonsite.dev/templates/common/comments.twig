@@ -1,5 +1,5 @@
 {# comments.twig #}
-{% set comments_per_page = 50 %}
+{% set comments_per_page = 10 %}
 {% fetch "comments", amount = comments_per_page, sort = "threads_recent", replies_limit = 2, hot_size = 3, hot_min_likes = 2 %}
     <div
         class="comments"
