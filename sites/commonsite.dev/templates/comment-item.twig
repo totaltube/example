@@ -47,11 +47,11 @@
                         {% if comment.ParentId > 0 and not is_deleted %}
                             {% if reply_to_name %}
                                 <a class="comment-parent-link" href="#comment-{{ comment.ParentId }}" title="{{ translate("Replying to") }} {{ reply_to_name }}" aria-label="{{ translate("Replying to") }} {{ reply_to_name }}">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 20V10H9"/><path d="M9 10l4-4"/><path d="M9 10l4 4"/></svg>
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 19h-7a2 2 0 0 1-2-2V5"/><path d="m15 9-4-4-4 4"/></svg>
                                 </a>
                             {% else %}
                                 <a class="comment-parent-link" href="#comment-{{ comment.ParentId }}" title="{{ translate("Replying to") }} #{{ comment.ParentId }}" aria-label="{{ translate("Replying to") }} #{{ comment.ParentId }}">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 20V10H9"/><path d="M9 10l4-4"/><path d="M9 10l4 4"/></svg>
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 19h-7a2 2 0 0 1-2-2V5"/><path d="m15 9-4-4-4 4"/></svg>
                                 </a>
                             {% endif %}
                         {% endif %}
@@ -87,14 +87,16 @@
                 {% set is_cross_site = current_site_id > 0 and comment.SiteId > 0 and comment.SiteId != current_site_id %}
                 <button class="reply-button {% if comment.Indent >= 10 or is_cross_site %}hidden{% endif %}">{{ translate("Reply") }}</button>
                 <button class="delete-button hidden">{{ translate("Delete") }}</button>
-                <a class="comment-permalink" href="#comment-{{ comment.CommentId }}" aria-label="Comment link">#</a>
             </div>
             <div class="comment-reply {% if comment.Indent >= 10 or is_cross_site %}hidden{% endif %}">
                 <textarea class="comment-input" placeholder="{{ translate("Write a reply...") }}"></textarea>
                 <button class="send-comment-button">{{ translate("Reply") }}</button>
             </div>
-            {% endif %}
         </div>
+        {% if not is_deleted %}
+        <a class="comment-permalink" href="#comment-{{ comment.CommentId }}" aria-label="Comment link">#</a>
+        {% endif %}
+        {% endif %}
     </div>
 </li>
 {% endif %}

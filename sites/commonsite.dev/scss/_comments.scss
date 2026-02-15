@@ -399,11 +399,6 @@ $comments-score-neutral: mix($text-color, $background-color, 62%);
         text-decoration: underline;
       }
     }
-
-    .comment-permalink {
-      display: none; // Hide permalink hash for now as per design focus
-      // OR style it very subtly if needed
-    }
   }
 
   .comment-reply {
@@ -451,6 +446,25 @@ $comments-score-neutral: mix($text-color, $background-color, 62%);
       &:hover {
         background-color: darken($comments-primary, 10%);
       }
+    }
+  }
+
+  .comment-permalink {
+    position: absolute;
+    right: 14px;
+    bottom: 14px;
+    color: $comments-muted !important;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.85rem;
+    opacity: 0.6;
+    transition: opacity 0.2s, color 0.2s;
+    z-index: 10;
+
+    &:hover {
+      opacity: 1;
+      color: $comments-muted !important;
+      text-decoration: underline;
     }
   }
 }

@@ -234,7 +234,7 @@ function renderComment(c: Comment): HTMLElement {
         const replyTo = c.ReplyToUsername || $(`.comment-container[data-comment-id="${c.ParentId}"] .comment-username`)?.textContent?.trim() || ""
         if (replyTo) container.dataset.replyToUsername = replyTo
         context.innerHTML = `<a class="comment-parent-link" href="#comment-${c.ParentId}" title="${i18n.replyingTo} ${replyTo}" aria-label="${i18n.replyingTo} ${replyTo}">
-      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 20V10H9"/><path d="M9 10l4-4"/><path d="M9 10l4 4"/></svg>
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 19h-7a2 2 0 0 1-2-2V5"/><path d="m15 9-4-4-4 4"/></svg>
     </a>`
         context.classList.remove("hidden")
     } else if (context) {
