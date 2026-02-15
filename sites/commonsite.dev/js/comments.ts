@@ -403,7 +403,10 @@ function updateMoreRepliesControl(parentLi: HTMLElement, parentContainer: HTMLEl
 
     // Thread API contract: empty next_cursor means no more chunks available for this parent.
     // In this case parent-level "load more" must depend only on currently hidden direct nodes.
-    if (!hasNextCursor && hiddenDirect.length <= 0) {
+    // BUT for SSR comments we might not have a cursor yet, so we must also check directReplyTotal vs visible count.
+    const hasMoreInAPI = directReplyTotal > visibleDirectCount
+    if (!hasNextCursor && hiddenDirect.length <= 0 &&
+        !hasMoreInAPI) {
         $(`.comment-more-item[data-parent-id="${parentId}"]`)?.remove()
         return
     }
