@@ -137,16 +137,31 @@ $comments-score-neutral: mix($text-color, $background-color, 62%);
   align-items: flex-start;
   padding: 14px;
   border: 1px solid $comments-border;
-  border-radius: 14px;
-  background: linear-gradient(180deg, $comments-surface-strong 0%, $comments-surface-soft 100%);
+  // Modern commercial gradient: Slightly lighter top-left, darker bottom-right, with a tiny hint of primary
+  // This simulates a soft light source (top-left)
+  background: linear-gradient(145deg,
+      mix(#ffffff, $comments-surface-strong, 60%) 0%,
+      mix($comments-primary, $comments-surface-soft, 2%) 100%);
+
+  // Clean, thin border that almost disappears but gives definition
+  border: 1px solid rgba($comments-border, 0.6);
+
+  // Soft, diffuse shadow for depth
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03), 0 1px 3px rgba(0, 0, 0, 0.04);
+
+  border-radius: 16px; // Slightly rounder for modern feel
   margin-inline-start: calc(var(--comment-indent, 0) * var(--comment-indent-step));
-  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+  transition: box-shadow 0.25s ease, transform 0.25s ease, border-color 0.2s ease;
   scroll-margin-top: 80px;
-  position: relative; // For positioning if needed
+  position: relative;
 
   &:hover {
-    border-color: darken($comments-border, 8%);
-    box-shadow: 0 8px 22px rgba(33, 47, 70, 0.09);
+    border-color: rgba($comments-primary, 0.25);
+    box-shadow: 0 8px 25px rgba(33, 47, 70, 0.08), 0 2px 6px rgba(0, 0, 0, 0.03);
+    transform: translateY(-1px); // Subtle lift
+
+    // Add a subtle sheen on hover via adjusting gradient? Or just stick to shadow/border.
+    // background: linear-gradient(145deg, $white 0%, mix($comments-primary, $comments-surface-soft, 4%) 100%);
   }
 
   &:target {
@@ -161,13 +176,18 @@ $comments-score-neutral: mix($text-color, $background-color, 62%);
   &.is-reply::before {
     content: "";
     position: absolute;
-    top: -18px;
-    left: -10px;
-    width: 8px;
-    height: calc(100% + 4px);
-    border-left: 2px solid rgba($comments-primary, 0.25);
-    border-bottom: 2px solid rgba($comments-primary, 0.25);
-    border-radius: 0 0 0 8px;
+    top: auto;
+    bottom: 33%; // "Lower third" as requested
+    left: -18px;
+    width: 18px;
+    height: var(--thread-height, 30px);
+
+    // Thinner and less contrast (more subtle commercial look)
+    border-left: 1.5px solid darken($comments-border, 8%);
+    border-bottom: 1.5px solid darken($comments-border, 8%);
+    border-bottom-left-radius: 12px;
+    z-index: -1;
+    box-sizing: border-box;
     pointer-events: none;
   }
 

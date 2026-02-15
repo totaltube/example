@@ -296,7 +296,7 @@ function getParentMeta(container: HTMLElement) {
         parentId: toNum(container.dataset.commentId),
         parentIndent: toNum(container.dataset.indent),
         totalReplies: toNum(container.dataset.replyCount),
-        directReplyTotal: container.dataset.directReplyTotal === undefined ? -1 : toNum(container.dataset.directReplyTotal, -1),
+        directReplyTotal: container.dataset.directReplyTotal === undefined ? toNum(container.dataset.replyCount, -1) : toNum(container.dataset.directReplyTotal, -1),
     }
 }
 
@@ -551,6 +551,9 @@ async function loadComments(contentId: string | null, from = 0) {
             collapseInitialReplies()
         }
 
+        // Fix z-indices and own comment states for all items
+        disableOwnCommentReactions()
+
         revealCommentsList()
     } catch (e) {
         console.error("Failed to load comments", e)
@@ -764,6 +767,7 @@ async function loadMoreReplies(parentId: number, parentLi: HTMLElement, parentCo
         }
 
         updateMoreRepliesControl(parentLi, parentContainer)
+        disableOwnCommentReactions() // Update z-indices so new replies sit behind parents
         if (focusTarget) focusNewComment(focusTarget)
     } catch (err) {
         console.error("Failed to load more replies", err)
@@ -777,8 +781,14 @@ async function loadMoreReplies(parentId: number, parentLi: HTMLElement, parentCo
 // Keep like/dislike visible but inactive for own comments on SSR-rendered content
 function disableOwnCommentReactions() {
     const currentUserId = getCurrentUserId()
-    if (currentUserId <= 0) return
-    $$(".comment-container[data-user-id]").forEach(container => {
+    const allComments = $$(".comment-container[data-user-id]")
+
+    // Reverse z-index: higher index for earlier comments so they cover the lines of later comments
+    const baseZIndex = 10000
+    allComments.forEach((container, i) => {
+        container.style.zIndex = String(baseZIndex - i)
+
+        if (currentUserId <= 0) return
         const commentUserId = toNum(container.dataset.userId)
         if (commentUserId > 0 && commentUserId === currentUserId) {
             container.classList.add("own-comment")
@@ -790,7 +800,35 @@ function disableOwnCommentReactions() {
             if (dislikeBtn) dislikeBtn.disabled = true
         }
     })
+
+    // Also update thread lines since layout might have changed or new comments added
+    // Use requestAnimationFrame to ensure layout is settled (though usually it is sync)
+    requestAnimationFrame(updateThreadLines)
 }
+
+function updateThreadLines() {
+    $$(".comment-container.is-reply").forEach(child => {
+        const parentId = child.dataset.parentId
+        // Use attribute selector because container IDs might have tmp- prefix
+        const parent = $(`.comment-container[data-comment-id="${parentId}"]`)
+        if (!parent) return
+
+        const childRect = child.getBoundingClientRect()
+        const parentRect = parent.getBoundingClientRect()
+
+        const childCenter = childRect.top + childRect.height / 2
+        const parentCenter = parentRect.top + parentRect.height / 2
+        const dist = childCenter - parentCenter
+
+        if (dist > 0) {
+            child.style.setProperty("--thread-height", `${dist}px`)
+        }
+    })
+}
+
+window.addEventListener("resize", () => {
+    requestAnimationFrame(updateThreadLines)
+})
 
 // Event handlers
 document.addEventListener("DOMContentLoaded", () => {
