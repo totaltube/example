@@ -161,13 +161,14 @@ $comments-score-neutral: mix($text-color, $background-color, 62%);
   &.is-reply::before {
     content: "";
     position: absolute;
-    top: 14px;
+    top: -18px;
     left: -10px;
     width: 8px;
-    height: calc(100% - 28px);
+    height: calc(100% + 4px);
     border-left: 2px solid rgba($comments-primary, 0.25);
     border-bottom: 2px solid rgba($comments-primary, 0.25);
     border-radius: 0 0 0 8px;
+    pointer-events: none;
   }
 
   .avatar {

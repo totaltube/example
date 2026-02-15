@@ -16,6 +16,7 @@ let commentsTotalCount = 0
 let isLoadingMoreComments = false
 let allCommentsLoaded = false
 let loginWaitPromise: Promise<string | null> | null = null
+let isHashContextMode = false
 
 const $ = (sel: string, el?: Element) => (el || document).querySelector(sel) as HTMLElement | null
 const $$ = (sel: string, el?: Element) => Array.from((el || document).querySelectorAll(sel)) as HTMLElement[]
@@ -76,13 +77,25 @@ const api = {
     get: async (path: string, params: Record<string, any> = {}) => {
         const qs = new URLSearchParams()
         Object.keys(params).forEach((k) => {
-            qs.append(k, String(params[k]))
+            const v = params[k]
+            if (v === undefined || v === null || v === "") return
+            qs.append(k, String(v))
         })
         return fetch(`${endpoint}${path}?${qs}`, { headers: api.headers() })
     },
     post: async (path: string, body?: any) => fetch(`${endpoint}${path}`, {
         method: "POST", headers: api.headers(), body: body ? JSON.stringify(body) : undefined
     }),
+}
+
+type CommentsContextResponse = {
+    success?: boolean
+    items?: any[]
+    total?: number
+    target_comment_id?: number
+    root_id?: number
+    has_more_before?: boolean
+    next_cursor?: string
 }
 
 async function requestWithAuthRetry(url: string, init: RequestInit): Promise<any> {
@@ -131,7 +144,7 @@ interface Comment {
     CommentId: number; SiteId: number; ParentId: number; Indent: number; ReplyCount: number
     Avatar: string; Username: string; ReplyToUsername: string; Text: string
     Likes: number; Dislikes: number; IsLiked: boolean; IsDisliked: boolean
-    Status: string; UserId: number; Created: string
+    Status: string; UserId: number; Created: string; Path: string
 }
 
 function normalizeComment(raw: Record<string, any>, fallback: Partial<Comment> = {}): Comment {
@@ -153,6 +166,7 @@ function normalizeComment(raw: Record<string, any>, fallback: Partial<Comment> =
         Status: String(raw?.Status ?? raw?.status ?? fallback.Status ?? "approved"),
         UserId: toNum(raw?.UserId ?? raw?.user_id ?? fallback.UserId),
         Created: String(raw?.Created ?? raw?.created ?? fallback.Created ?? ""),
+        Path: String(raw?.Path ?? raw?.path ?? (fallback as any).Path ?? ""),
     }
 }
 
@@ -380,47 +394,36 @@ function getOrCreateMoreRepliesLi(parentLi: HTMLElement, parentContainer: HTMLEl
 }
 
 function updateMoreRepliesControl(parentLi: HTMLElement, parentContainer: HTMLElement) {
-    const { parentId, totalReplies, parentIndent, directReplyTotal } = getParentMeta(parentContainer)
+    const { parentId, directReplyTotal } = getParentMeta(parentContainer)
     const allDirect = getDirectChildren(parentLi, parentContainer)
     const hiddenDirect = allDirect.filter(li => li.style.display === "none")
+    const visibleDirectCount = allDirect.length - hiddenDirect.length
 
-    let visibleDescendants = 0
-    let cursor = parentLi.nextElementSibling as HTMLElement | null
-    while (cursor) {
-        const c = $(".comment-container", cursor)
-        if (!c) { cursor = cursor.nextElementSibling as HTMLElement | null; continue }
-        const indent = toNum(c.dataset.indent)
-        if (indent <= parentIndent) break
-        if (cursor.style.display !== "none") visibleDescendants++
-        cursor = cursor.nextElementSibling as HTMLElement | null
-    }
+    const hasNextCursor = Boolean(parentContainer.dataset.nextCursor)
 
-    if (totalReplies <= 0 && hiddenDirect.length <= 0) {
+    // Thread API contract: empty next_cursor means no more chunks available for this parent.
+    // In this case parent-level "load more" must depend only on currently hidden direct nodes.
+    if (!hasNextCursor && hiddenDirect.length <= 0) {
         $(`.comment-more-item[data-parent-id="${parentId}"]`)?.remove()
         return
     }
 
     let remainingDirect = 0
-    if (directReplyTotal >= 0) {
-        remainingDirect = Math.max(0, directReplyTotal - allDirect.filter(li => li.style.display !== "none").length)
-    } else if (hiddenDirect.length > 0) {
+    if (hiddenDirect.length > 0) {
         remainingDirect = hiddenDirect.length
-    } else if (totalReplies > visibleDescendants) {
+    } else if (directReplyTotal >= 0) {
+        remainingDirect = Math.max(0, directReplyTotal - visibleDirectCount)
+    } else if (hasNextCursor) {
         remainingDirect = 1
     }
 
-    const remainingDescendants = Math.max(0, totalReplies - visibleDescendants)
-    const hasNextCursor = Boolean(parentContainer.dataset.nextCursor)
-
-    // Parent "load more" should not stay alive when direct replies are exhausted and API has no next cursor.
-    // Deeper descendants must be loaded from their own parent controls.
-    if ((!hasNextCursor && remainingDirect <= 0) || (remainingDirect <= 0 && remainingDescendants <= 0) || allDirect.filter(li => li.style.display !== "none").length >= MAX_SIBLINGS) {
+    if (remainingDirect <= 0 || visibleDirectCount >= MAX_SIBLINGS) {
         $(`.comment-more-item[data-parent-id="${parentId}"]`)?.remove()
         return
     }
 
     const moreLi = getOrCreateMoreRepliesLi(parentLi, parentContainer)
-    const count = Math.max(remainingDirect, remainingDescendants)
+    const count = remainingDirect
     moreLi.dataset.remaining = String(count)
     moreLi.dataset.hiddenDirect = String(hiddenDirect.length)
 
@@ -452,6 +455,19 @@ function focusNewComment(li: HTMLElement) {
     container.setAttribute("tabindex", "-1")
     container.scrollIntoView({ behavior: "smooth", block: "center" })
     try { container.focus({ preventScroll: true }) } catch { container.focus() }
+}
+
+function revealCommentPath(commentId: number) {
+    let currentId = commentId
+    let guard = 0
+    while (currentId > 0 && guard < 100) {
+        const container = $(`.comment-container[data-comment-id="${currentId}"]`) as HTMLElement | null
+        if (!container) break
+        const li = container.closest("li") as HTMLElement | null
+        if (li) setSubtreeVisibility(li, true)
+        currentId = toNum(container.dataset.parentId)
+        guard++
+    }
 }
 
 function getReactionState(container: HTMLElement) {
@@ -553,6 +569,137 @@ async function loadMoreComments(contentId: string | null) {
     } finally {
         isLoadingMoreComments = false
         $(".comments-loading")?.classList.add("hidden")
+    }
+}
+
+function getCommentIdFromHash(): number {
+    const m = (window.location.hash || "").match(/^#comment-(\d+)$/)
+    return m ? toNum(m[1]) : 0
+}
+
+function recomputeLoadedReplyCounts() {
+    const all = $$(".comment-container[data-comment-id]")
+
+    all.forEach(parent => {
+        const parentId = toNum(parent.dataset.commentId)
+        const parentIndent = toNum(parent.dataset.indent)
+        if (parentId <= 0) return
+        const parentLi = parent.closest("li") as HTMLElement | null
+        if (!parentLi) return
+
+        let descendantsCount = 0
+        let directCount = 0
+        let cursor = parentLi.nextElementSibling as HTMLElement | null
+        while (cursor) {
+            const c = $(".comment-container", cursor)
+            if (!c) { cursor = cursor.nextElementSibling as HTMLElement | null; continue }
+            const indent = toNum(c.dataset.indent)
+            if (indent <= parentIndent) break
+            descendantsCount++
+            if (toNum(c.dataset.parentId) === parentId) directCount++
+            cursor = cursor.nextElementSibling as HTMLElement | null
+        }
+
+        // In context-mode we have a bounded slice. Treat loaded data as authoritative snapshot
+        // to avoid phantom "load more" controls that rely on stale denormalized counters.
+        parent.dataset.replyCount = String(descendantsCount)
+        parent.dataset.directReplyTotal = String(directCount)
+        parent.dataset.nextCursor = ""
+    })
+}
+
+function insertCommentsBatch(items: any[]) {
+    const list = $(".comments > ul")
+    if (!list || !Array.isArray(items) || items.length === 0) return
+
+    const known = new Set($$(".comment-container[data-comment-id]").map(el => String(toNum(el.dataset.commentId))).filter(Boolean))
+    const valid = items
+        .map((raw: any) => normalizeComment(raw))
+        .filter((c: Comment) => c.CommentId > 0 && !known.has(String(c.CommentId)) && !(c.Status === "deleted" && c.ReplyCount <= 0))
+
+    if (valid.length === 0) return
+
+    valid.sort((a, b) => {
+        if (a.Path && b.Path) return a.Path.localeCompare(b.Path)
+        if (a.Indent !== b.Indent) return a.Indent - b.Indent
+        return a.CommentId - b.CommentId
+    })
+
+    let anchor: HTMLElement | null = null
+    valid.forEach(c => {
+        const el = renderComment(c)
+        const parentLi = c.ParentId > 0 ? $(`.comment-container[data-comment-id="${c.ParentId}"]`)?.closest("li") as HTMLElement | null : null
+        if (parentLi) {
+            const parentContainer = $(".comment-container", parentLi)
+            if (parentContainer) {
+                const threadAnchor = findThreadAnchor(parentLi, parentContainer)
+                threadAnchor.insertAdjacentElement("afterend", el)
+                return
+            }
+        }
+        if (anchor) {
+            anchor.insertAdjacentElement("afterend", el)
+        } else {
+            list.appendChild(el)
+        }
+        anchor = el
+    })
+
+    // Context slice may contain partial thread and stale reply_count from backend.
+    // Recompute from actually loaded DOM to prevent ghost "load more" controls.
+    recomputeLoadedReplyCounts()
+
+    if (isHashContextMode) {
+        // In hash-context mode we must show the restored thread as-is and avoid
+        // creating synthetic parent "load more" controls from local collapsing.
+        $$(".comment-more-item").forEach(el => el.remove())
+    } else {
+        collapseInitialReplies()
+    }
+}
+
+async function hydrateFromHashContext(contentId: string | null) {
+    if (!contentId) return
+    const targetId = getCommentIdFromHash()
+    if (!targetId) return
+
+    const existing = $(`#comment-${targetId}`)?.closest("li") as HTMLElement | null
+    if (existing) {
+        focusNewComment(existing)
+        return
+    }
+
+    const section = $(".comments")
+    const params: Record<string, any> = {
+        content_id: contentId,
+        comment_id: targetId,
+        limit: 100,
+        site_id: toNum(section?.dataset.siteId) || undefined,
+        lang: (globals.lang || "").trim() || undefined,
+    }
+
+    try {
+        const res = await api.get("/context", params)
+        const json = await res.json() as CommentsContextResponse
+        if (!json?.success || !Array.isArray(json.items) || json.items.length === 0) return
+
+        const list = $(".comments > ul")
+        // Hash-context hydration must replace current tree fully, otherwise stale
+        // SSR/client controls (e.g. old .comment-more-item) can survive and create
+        // ghost "load more" buttons that instantly disappear on click.
+        if (list) {
+            list.innerHTML = ""
+        }
+
+        isHashContextMode = true
+        insertCommentsBatch(json.items)
+        revealCommentsList()
+        revealCommentPath(targetId)
+
+        const target = $(`#comment-${targetId}`)?.closest("li") as HTMLElement | null
+        if (target) focusNewComment(target)
+    } catch (err) {
+        console.error("Failed to hydrate comments context by hash", err)
     }
 }
 
@@ -670,11 +817,13 @@ document.addEventListener("DOMContentLoaded", () => {
         // Initialize thread controls for SSR comments (load-more replies button, collapsed replies state)
         collapseInitialReplies()
         revealCommentsList()
+        void hydrateFromHashContext(contentId)
     } else {
         const observer = new IntersectionObserver(entries => {
             if (entries[0].isIntersecting) {
                 observer.disconnect()
                 loadComments(contentId)
+                void hydrateFromHashContext(contentId)
             }
         })
         observer.observe(section)
