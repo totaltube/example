@@ -51,10 +51,20 @@ const i18n = (() => {
         noComments: get("no-comments", "No comments yet."),
         loading: get("loading", "Loading..."),
         deleted: get("comment-deleted", "Comment deleted"),
+        deletedByUser: get("comment-deleted-by-user", "Comment deleted by user"),
+        moderated: get("comment-moderated", "Comment moderated"),
         deleteConfirm: get("delete-confirm", "Delete this comment?"),
         reply: get("reply", "Reply"),
     }
 })()
+
+const getDeletedCommentText = (c: Comment): string => {
+    if (c.Status !== "deleted") return c.Text
+    const reason = (c.Text || "").trim().toLowerCase()
+    if (reason === "deleted_by_user") return i18n.deletedByUser
+    if (reason === "moderated") return i18n.moderated
+    return i18n.deleted
+}
 
 const api = {
     headers: (withToken = true): HeadersInit => {
@@ -204,7 +214,7 @@ function renderComment(c: Comment): HTMLElement {
     }
 
     const text = $(".comment-text", container)
-    if (text) text.textContent = isDeleted ? i18n.deleted : c.Text
+    if (text) text.textContent = isDeleted ? getDeletedCommentText(c) : c.Text
 
     const actions = $(".comment-actions", container)
     const replyBox = $(".comment-reply", container)

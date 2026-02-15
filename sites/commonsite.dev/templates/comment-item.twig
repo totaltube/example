@@ -9,6 +9,13 @@
         {% endfor %}
     {% endif %}
     {% set is_deleted = comment.Status == "deleted" %}
+    {% set deleted_reason = comment.Text|default:"" %}
+    {% set deleted_text = translate("Comment deleted") %}
+    {% if is_deleted and deleted_reason == "deleted_by_user" %}
+        {% set deleted_text = translate("Comment deleted by user") %}
+    {% elseif is_deleted and deleted_reason == "moderated" %}
+        {% set deleted_text = translate("Comment moderated") %}
+    {% endif %}
     <div
         class="comment-container{% if comment.ParentId > 0 %} is-reply{% endif %}{% if is_deleted %} comment-deleted{% endif %}"
         id="comment-{{ comment.CommentId }}"

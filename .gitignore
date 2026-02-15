@@ -1,5 +1,7 @@
 # Logs
 logs
+sites/commonsite.dev/public/*.js
+sites/commonsite.dev/public/*.css
 *.log
 npm-debug.log*
 yarn-debug.log*
