@@ -13,12 +13,15 @@ $comments-input-border: darken($background-color, 15%);
 $icon-size: 20px;
 $comments-icon: mix($selected-color, $text-color, 45%);
 $comments-count-font-size: $font-size-smaller;
+$comments-score-positive: mix($selected-color, #2ecc71, 35%);
+$comments-score-negative: mix($selected-color, #e74c3c, 35%);
+$comments-score-neutral: mix($text-color, $background-color, 62%);
 
 .comments-wrapper {
   max-width: 860px;
   margin: 40px auto;
   width: 100%;
-  max-height: 800px;
+  max-height: 2400px;
   overflow-y: auto;
   padding: 0 10px;
   box-sizing: border-box;
@@ -84,6 +87,15 @@ $comments-count-font-size: $font-size-smaller;
 .comments>ul>li {
   margin-bottom: 10px;
 }
+
+.comments-list-hidden-until-js {
+  visibility: hidden;
+}
+
+.comments-list-hidden-until-js.comments-list-visible {
+  visibility: visible;
+}
+
 
 .comment-more-item {
   margin-bottom: 8px;
@@ -222,10 +234,13 @@ $comments-count-font-size: $font-size-smaller;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      transition: color 0.2s;
+      transition: color 0.2s, opacity 0.2s;
+      opacity: 0.9;
+      text-decoration: none;
 
       &:hover {
-        color: $comments-primary;
+        color: $comments-text;
+        opacity: 1;
       }
 
       svg {
@@ -247,6 +262,18 @@ $comments-count-font-size: $font-size-smaller;
       min-width: 1ch;
       text-align: center;
       margin: 0 2px;
+
+      &.score-positive {
+        color: $comments-score-positive !important;
+      }
+
+      &.score-negative {
+        color: $comments-score-negative !important;
+      }
+
+      &.score-neutral {
+        color: $comments-score-neutral !important;
+      }
     }
 
     button {
@@ -255,7 +282,7 @@ $comments-count-font-size: $font-size-smaller;
       cursor: pointer;
       padding: 2px;
       color: $comments-muted;
-      transition: color 0.2s ease;
+      transition: color 0.2s ease, opacity 0.2s ease, filter 0.2s ease;
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -268,9 +295,40 @@ $comments-count-font-size: $font-size-smaller;
         color: $comments-primary;
       }
 
+      &.is-disabled,
+      &:disabled {
+        opacity: 0.5 !important;
+        cursor: not-allowed;
+        color: mix($comments-muted, $background-color, 58%) !important;
+        filter: grayscale(0.45);
+        pointer-events: none;
+      }
+
+      &.is-disabled .c-icon,
+      &:disabled .c-icon {
+        opacity: 0.62;
+      }
+
+      &.is-disabled:hover,
+      &:disabled:hover {
+        color: mix($comments-muted, $background-color, 58%) !important;
+      }
+
       .c-icon {
         width: 16px;
         height: 16px;
+      }
+    }
+
+    // For own comments dim only buttons, keep score color readable
+    .comment-container.own-comment & {
+      .score-count {
+        opacity: 1;
+      }
+
+      .like-button,
+      .dislike-button {
+        opacity: 0.62;
       }
     }
 
@@ -421,7 +479,8 @@ $comments-count-font-size: $font-size-smaller;
 
 .comment-form {
   display: block;
-  margin-top: 14px;
+  margin-top: 12px;
+  margin-bottom: 12px;
   padding: 12px;
   border: 1px solid $comments-border;
   border-radius: 14px;

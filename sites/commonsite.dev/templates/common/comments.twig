@@ -1,19 +1,17 @@
 {# comments.twig #}
-{% set comments_per_page = 10 %}
-{% set comment_page_num = comment_page | default:1 %}
-{% set comment_from = (comment_page_num - 1) * comments_per_page %}
-{% fetch "comments", amount = comments_per_page, from = comment_from, sort = "threads_recent", replies_limit = 2, hot_size = 3, hot_min_likes = 2 %}
+{% set comments_per_page = 50 %}
+{% fetch "comments", amount = comments_per_page, sort = "threads_recent", replies_limit = 2, hot_size = 3, hot_min_likes = 2 %}
     <div
         class="comments"
         data-content-id="{{ content_item.Id }}"
         data-site-id="{{ config.SiteId }}"
         data-sort="threads_recent"
         data-size="{{ comments_per_page }}"
-        data-hot-size="3"
+        data-hot-size="2"
         data-hot-min-likes="2"
         data-initial-replies-limit="2"
-        data-thread-direct-size="5"
-        data-thread-replies-limit="2"
+        data-thread-direct-size="30"
+        data-thread-replies-limit="5"
         data-i18n-replying-to="{{ translate("Replying to") }}"
         data-i18n-no-comments="{{ translate("No comments yet.") }}"
         data-i18n-loading="{{ translate("Loading...") }}"
@@ -22,7 +20,7 @@
         data-i18n-comment-moderated="{{ translate("Comment moderated") }}"
         data-i18n-delete-confirm="{{ translate("Delete this comment?") }}"
         data-i18n-reply="{{ translate("Reply") }}"
-        data-comment-page="{{ comment_page_num }}"
+        data-comment-page="1"
         data-comments-total="{{ comments.Total }}"
     >
         <div class="comment-form auth-protected-content">
@@ -43,9 +41,9 @@
         <div class="auth-login-container">
             <button class="auth-login-btn">{{ translate("Login to comment") }}</button>
         </div>
-        <ul>
+        <ul class="comments-list comments-list-hidden-until-js">
         {% if comments.HotItems or comments.Items %}
-            {% if comments.HotItems and comment_page_num <= 1 %}
+            {% if comments.HotItems %}
                 {% for comment in comments.HotItems %}
                     {% include "../comment-item.twig" %}
                 {% endfor %}
@@ -59,19 +57,7 @@
         </ul>
         <div class="comments-loading hidden">{{ translate("Loading...") }}</div>
         <div class="comments-sentinel"></div>
-        {# SEO pagination links for bots #}
-        {% set total_comment_pages = (comments.Total + comments_per_page - 1) / comments_per_page %}
-        {% if total_comment_pages > 1 %}
-        <nav class="comments-pagination" aria-label="Comments pagination">
-            {% if comment_page_num > 1 %}
-                <a href="?{{ config.Params.CommentPage }}={{ comment_page_num - 1 }}" rel="prev">&laquo; {{ translate("Previous") }}</a>
-            {% endif %}
-            <span class="comments-page-info">{{ comment_page_num }} / {{ total_comment_pages }}</span>
-            {% if comment_page_num < total_comment_pages %}
-                <a href="?{{ config.Params.CommentPage }}={{ comment_page_num + 1 }}" rel="next">{{ translate("Next") }} &raquo;</a>
-            {% endif %}
-        </nav>
-        {% endif %}
+
     </div>
 {% endfetch %}
 

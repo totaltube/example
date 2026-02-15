@@ -170,6 +170,20 @@ const formatDate = (dateStr: string) => {
 
 const template = $("#comment-template-js") as HTMLTemplateElement | null
 
+function revealCommentsList() {
+    const list = $(".comments > ul")
+    if (!list) return
+    list.classList.add("comments-list-visible")
+}
+
+function setScoreTone(scoreEl: HTMLElement | null, score: number) {
+    if (!scoreEl) return
+    scoreEl.classList.remove("score-positive", "score-negative", "score-neutral")
+    if (score > 0) scoreEl.classList.add("score-positive")
+    else if (score < 0) scoreEl.classList.add("score-negative")
+    else scoreEl.classList.add("score-neutral")
+}
+
 function renderComment(c: Comment): HTMLElement {
     const frag = template?.content.cloneNode(true) as DocumentFragment
     const li = frag?.querySelector("li") as HTMLElement
@@ -190,6 +204,7 @@ function renderComment(c: Comment): HTMLElement {
     container.dataset.userId = String(c.UserId || 0)
     container.style.setProperty("--comment-indent", String(c.Indent || 0))
     container.classList.toggle("is-reply", c.ParentId > 0)
+    container.classList.toggle("own-comment", isOwner)
     if (isDeleted) container.classList.add("comment-deleted")
 
     const avatar = $(".avatar img", container) as HTMLImageElement
@@ -204,8 +219,8 @@ function renderComment(c: Comment): HTMLElement {
     if (context && c.ParentId > 0 && !isDeleted) {
         const replyTo = c.ReplyToUsername || $(`.comment-container[data-comment-id="${c.ParentId}"] .comment-username`)?.textContent?.trim() || ""
         if (replyTo) container.dataset.replyToUsername = replyTo
-        context.innerHTML = `<a class="comment-parent-link" href="#comment-${c.ParentId}" title="${i18n.replyingTo} ${replyTo}">
-      <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="3" fill="none"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+        context.innerHTML = `<a class="comment-parent-link" href="#comment-${c.ParentId}" title="${i18n.replyingTo} ${replyTo}" aria-label="${i18n.replyingTo} ${replyTo}">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 20V10H9"/><path d="M9 10l4-4"/><path d="M9 10l4 4"/></svg>
     </a>`
         context.classList.remove("hidden")
     } else if (context) {
@@ -229,14 +244,22 @@ function renderComment(c: Comment): HTMLElement {
         $(".like-button", container)?.classList.toggle("active", c.IsLiked)
         $(".dislike-button", container)?.classList.toggle("active", c.IsDisliked)
 
-        // Hide like/dislike buttons for own comments
+        // Keep like/dislike visible for own comments, but make them inactive
         if (isOwner) {
-            $(".like-button", container)?.classList.add("hidden")
-            $(".dislike-button", container)?.classList.add("hidden")
+            const likeBtn = $(".like-button", container) as HTMLButtonElement | null
+            const dislikeBtn = $(".dislike-button", container) as HTMLButtonElement | null
+            likeBtn?.classList.add("is-disabled")
+            dislikeBtn?.classList.add("is-disabled")
+            if (likeBtn) likeBtn.disabled = true
+            if (dislikeBtn) dislikeBtn.disabled = true
         }
 
         const score = $(".score-count", container)
-        if (score) score.textContent = String(c.Likes - c.Dislikes)
+        if (score) {
+            const scoreValue = c.Likes - c.Dislikes
+            score.textContent = String(scoreValue)
+            setScoreTone(score, scoreValue)
+        }
 
         const replyBtn = $(".reply-button", container)
         const isCrossSite = toNum($(`.comments`)?.dataset.siteId) > 0 && c.SiteId > 0 && c.SiteId !== toNum($(`.comments`)?.dataset.siteId)
@@ -387,7 +410,11 @@ function updateMoreRepliesControl(parentLi: HTMLElement, parentContainer: HTMLEl
     }
 
     const remainingDescendants = Math.max(0, totalReplies - visibleDescendants)
-    if ((remainingDirect <= 0 && remainingDescendants <= 0) || allDirect.filter(li => li.style.display !== "none").length >= MAX_SIBLINGS) {
+    const hasNextCursor = Boolean(parentContainer.dataset.nextCursor)
+
+    // Parent "load more" should not stay alive when direct replies are exhausted and API has no next cursor.
+    // Deeper descendants must be loaded from their own parent controls.
+    if ((!hasNextCursor && remainingDirect <= 0) || (remainingDirect <= 0 && remainingDescendants <= 0) || allDirect.filter(li => li.style.display !== "none").length >= MAX_SIBLINGS) {
         $(`.comment-more-item[data-parent-id="${parentId}"]`)?.remove()
         return
     }
@@ -443,7 +470,10 @@ function setReactionState(container: HTMLElement, state: { isLiked: boolean; isD
     $(".like-button, .like-button-alt", container)?.classList.toggle("active", state.isLiked)
     $(".dislike-button, .dislike-button-alt", container)?.classList.toggle("active", state.isDisliked)
     const score = $(".score-count", container)
-    if (score) score.textContent = String(state.score)
+    if (score) {
+        score.textContent = String(state.score)
+        setScoreTone(score, state.score)
+    }
 }
 
 async function loadComments(contentId: string | null, from = 0) {
@@ -473,13 +503,18 @@ async function loadComments(contentId: string | null, from = 0) {
     try {
         const res = await api.get("/list", params)
         const json = await res.json()
-        if (!json.success || !json.items) return
+        if (!json.success || !json.items) {
+            revealCommentsList()
+            return
+        }
 
         isCurrentUserAdminFlag = Boolean(json.is_admin)
         // Store minion user_id from API for ownership comparison
         if (json.current_user_id > 0) {
             currentMinionUserId = toNum(json.current_user_id)
             console.log("[comments] Got current_user_id from API:", currentMinionUserId)
+            // Re-apply disabled state for SSR comments once exact minion user_id is known
+            disableOwnCommentReactions()
         }
         commentsTotalCount = json.total || 0
 
@@ -499,10 +534,14 @@ async function loadComments(contentId: string | null, from = 0) {
             })
             collapseInitialReplies()
         }
+
+        revealCommentsList()
     } catch (e) {
         console.error("Failed to load comments", e)
+        revealCommentsList()
     }
 }
+
 
 async function loadMoreComments(contentId: string | null) {
     if (!contentId || isLoadingMoreComments || allCommentsLoaded) return
@@ -547,12 +586,17 @@ async function loadMoreReplies(parentId: number, parentLi: HTMLElement, parentCo
             { method: "GET", headers: api.headers() }
         )
 
+        let focusTarget: HTMLElement | null = null
+
         if (json.total >= 0) parentContainer.dataset.directReplyTotal = String(json.total)
         if (json.next_cursor !== undefined) parentContainer.dataset.nextCursor = json.next_cursor || ""
 
         if (hiddenDirect.length > 0) {
             const reveal = Math.min(LOAD_MORE_BATCH, hiddenDirect.length)
-            for (let i = 0; i < reveal; i++) setSubtreeVisibility(hiddenDirect[i], true)
+            for (let i = 0; i < reveal; i++) {
+                setSubtreeVisibility(hiddenDirect[i], true)
+                focusTarget = hiddenDirect[i]
+            }
         }
 
         if (json.success && Array.isArray(json.items) && json.items.length > 0) {
@@ -567,11 +611,13 @@ async function loadMoreReplies(parentId: number, parentLi: HTMLElement, parentCo
                 const el = renderComment(c)
                 lastAnchor.insertAdjacentElement("afterend", el)
                 lastAnchor = el
+                focusTarget = el
                 if (c.CommentId > 0) known.add(String(c.CommentId))
             })
         }
 
         updateMoreRepliesControl(parentLi, parentContainer)
+        if (focusTarget) focusNewComment(focusTarget)
     } catch (err) {
         console.error("Failed to load more replies", err)
         moreBtn.textContent = prevText
@@ -581,15 +627,20 @@ async function loadMoreReplies(parentId: number, parentLi: HTMLElement, parentCo
     }
 }
 
-// Hide like/dislike buttons for own comments on SSR-rendered content
-function hideOwnCommentReactions() {
+// Keep like/dislike visible but inactive for own comments on SSR-rendered content
+function disableOwnCommentReactions() {
     const currentUserId = getCurrentUserId()
     if (currentUserId <= 0) return
     $$(".comment-container[data-user-id]").forEach(container => {
         const commentUserId = toNum(container.dataset.userId)
         if (commentUserId > 0 && commentUserId === currentUserId) {
-            $(".like-button", container)?.classList.add("hidden")
-            $(".dislike-button", container)?.classList.add("hidden")
+            container.classList.add("own-comment")
+            const likeBtn = $(".like-button", container) as HTMLButtonElement | null
+            const dislikeBtn = $(".dislike-button", container) as HTMLButtonElement | null
+            likeBtn?.classList.add("is-disabled")
+            dislikeBtn?.classList.add("is-disabled")
+            if (likeBtn) likeBtn.disabled = true
+            if (dislikeBtn) dislikeBtn.disabled = true
         }
     })
 }
@@ -607,16 +658,18 @@ document.addEventListener("DOMContentLoaded", () => {
     const ssrCommentsTotal = toNum(section.dataset.commentsTotal, 0)
     const pageSize = Math.max(1, Math.min(100, toNum(section.dataset.size, 50)))
 
-    // Hide reactions for own comments on page load
-    hideOwnCommentReactions()
+    // Keep reactions visible but inactive for own comments on page load
+    disableOwnCommentReactions()
 
-    if (hasServerComments && ssrCommentPage > 1) {
-        // Page 2+: keep SSR content, just initialize infinite scroll state
+    if (hasServerComments) {
+        // Keep SSR comments, do not re-render from page start to avoid flicker/CLS
         commentsLoadedFrom = (ssrCommentPage - 1) * pageSize + (list.querySelectorAll(":scope > li").length)
         commentsTotalCount = ssrCommentsTotal
         if (commentsLoadedFrom >= commentsTotalCount) allCommentsLoaded = true
-    } else if (hasServerComments) {
-        loadComments(contentId)
+
+        // Initialize thread controls for SSR comments (load-more replies button, collapsed replies state)
+        collapseInitialReplies()
+        revealCommentsList()
     } else {
         const observer = new IntersectionObserver(entries => {
             if (entries[0].isIntersecting) {
