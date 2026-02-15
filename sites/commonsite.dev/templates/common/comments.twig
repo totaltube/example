@@ -1,11 +1,14 @@
 {# comments.twig #}
-{% fetch "comments", amount = 50, sort = "threads_recent", replies_limit = 2, hot_size = 3, hot_min_likes = 2 %}
+{% set comments_per_page = 10 %}
+{% set comment_page_num = comment_page | default:1 %}
+{% set comment_from = (comment_page_num - 1) * comments_per_page %}
+{% fetch "comments", amount = comments_per_page, from = comment_from, sort = "threads_recent", replies_limit = 2, hot_size = 3, hot_min_likes = 2 %}
     <div
         class="comments"
         data-content-id="{{ content_item.Id }}"
         data-site-id="{{ config.SiteId }}"
         data-sort="threads_recent"
-        data-size="50"
+        data-size="{{ comments_per_page }}"
         data-hot-size="3"
         data-hot-min-likes="2"
         data-initial-replies-limit="2"
@@ -13,25 +16,13 @@
         data-thread-replies-limit="2"
         data-i18n-replying-to="{{ translate("Replying to") }}"
         data-i18n-no-comments="{{ translate("No comments yet.") }}"
-        data-i18n-more-replies="{{ translate("More {count} replies") }}"
         data-i18n-loading="{{ translate("Loading...") }}"
         data-i18n-comment-deleted="{{ translate("Comment deleted") }}"
         data-i18n-delete-confirm="{{ translate("Delete this comment?") }}"
+        data-i18n-reply="{{ translate("Reply") }}"
+        data-comment-page="{{ comment_page_num }}"
+        data-comments-total="{{ comments.Total }}"
     >
-        <ul>
-        {% if comments.HotItems or comments.Items %}
-            {% if comments.HotItems %}
-                {% for comment in comments.HotItems %}
-                    {% include "../comment-item.twig" %}
-                {% endfor %}
-            {% endif %}
-            {% for comment in comments.Items %}
-                {% include "../comment-item.twig" %}
-            {% endfor %}
-        {% else %}
-            <li><p>{{ translate("No comments yet.") }}</p></li>
-        {% endif %}
-        </ul>
         <div class="comment-form auth-protected-content">
             <div class="auth-profile" style="display: none;">
                 <div class="auth-user-info">
@@ -50,6 +41,35 @@
         <div class="auth-login-container">
             <button class="auth-login-btn">{{ translate("Login to comment") }}</button>
         </div>
+        <ul>
+        {% if comments.HotItems or comments.Items %}
+            {% if comments.HotItems and comment_page_num <= 1 %}
+                {% for comment in comments.HotItems %}
+                    {% include "../comment-item.twig" %}
+                {% endfor %}
+            {% endif %}
+            {% for comment in comments.Items %}
+                {% include "../comment-item.twig" %}
+            {% endfor %}
+        {% else %}
+            <li><p>{{ translate("No comments yet.") }}</p></li>
+        {% endif %}
+        </ul>
+        <div class="comments-loading hidden">{{ translate("Loading...") }}</div>
+        <div class="comments-sentinel"></div>
+        {# SEO pagination links for bots #}
+        {% set total_comment_pages = (comments.Total + comments_per_page - 1) / comments_per_page %}
+        {% if total_comment_pages > 1 %}
+        <nav class="comments-pagination" aria-label="Comments pagination">
+            {% if comment_page_num > 1 %}
+                <a href="?{{ config.Params.CommentPage }}={{ comment_page_num - 1 }}" rel="prev">&laquo; {{ translate("Previous") }}</a>
+            {% endif %}
+            <span class="comments-page-info">{{ comment_page_num }} / {{ total_comment_pages }}</span>
+            {% if comment_page_num < total_comment_pages %}
+                <a href="?{{ config.Params.CommentPage }}={{ comment_page_num + 1 }}" rel="next">{{ translate("Next") }} &raquo;</a>
+            {% endif %}
+        </nav>
+        {% endif %}
     </div>
 {% endfetch %}
 
@@ -60,17 +80,26 @@
                 <img src="/images/avatar_placeholder.png" alt="User Avatar">
             </div>
             <div class="comment-content">
-                <span class="comment-username"></span>
-                <div class="comment-context"></div>
+                <div class="comment-header">
+                     <div class="comment-info">
+                        <span class="comment-username"></span>
+                        <span class="comment-date"></span>
+                        <div class="comment-context hidden"></div>
+                     </div>
+                     <div class="comment-header-actions">
+                        <button class="like-button" aria-label="{{ translate("Like") }}">
+                            <span class="c-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg></span>
+                        </button>
+                        <span class="score-count">0</span>
+                        <button class="dislike-button" aria-label="{{ translate("Dislike") }}">
+                            <span class="c-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/></svg></span>
+                        </button>
+                     </div>
+                </div>
+                
                 <div class="comment-text"></div>
+                
                 <div class="comment-actions">
-                    <button class="like-button" aria-label="{{ translate("Like") }}">
-                        <span class="c-icon"></span>
-                    </button>
-                    <span class="score-count">0</span>
-                    <button class="dislike-button" aria-label="{{ translate("Dislike") }}">
-                        <span class="c-icon"></span>
-                    </button>
                     <button class="reply-button">{{ translate("Reply") }}</button>
                     <button class="delete-button hidden">{{ translate("Delete") }}</button>
                     <a class="comment-permalink" href="#" aria-label="Comment link">#</a>

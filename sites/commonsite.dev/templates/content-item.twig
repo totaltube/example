@@ -118,6 +118,8 @@
 			{{ show_content(item) }}
 		{% endfor %}
 	</main>
-	<h3 class="list-title">{{ translate("Comments") }}</h3>
-	{% include "common/comments.twig" %}
+	<div class="comments-wrapper">
+		<h3 class="list-title">{{ translate("Comments") }}</h3>
+		{% include "common/comments.twig" %}
+	</div>
 {% endblock %}

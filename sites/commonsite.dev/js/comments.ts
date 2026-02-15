@@ -1,1034 +1,835 @@
 import { getAuthToken as getStoredAuthToken, login } from "./auth"
 
-type Globals = {
-    lang: string
-    captcha_key: string
-    comments_endpoint?: string
+type Globals = { lang: string; captcha_key: string; comments_endpoint?: string }
+
+const globals = (window as any).globals as Globals
+const endpoint = globals.comments_endpoint || "/api-comments"
+const INITIAL_VISIBLE_REPLIES = 2
+const LOAD_MORE_BATCH = 5
+const MAX_INDENT = 9
+const MAX_SIBLINGS = 1000
+
+let isCurrentUserAdminFlag = false
+let currentMinionUserId = 0
+let commentsLoadedFrom = 0
+let commentsTotalCount = 0
+let isLoadingMoreComments = false
+let allCommentsLoaded = false
+let loginWaitPromise: Promise<string | null> | null = null
+
+const $ = (sel: string, el?: Element) => (el || document).querySelector(sel) as HTMLElement | null
+const $$ = (sel: string, el?: Element) => Array.from((el || document).querySelectorAll(sel)) as HTMLElement[]
+const attr = (el: Element | null, name: string) => el?.getAttribute(name)
+const toNum = (v: any, d = 0) => { const n = Number(v); return Number.isFinite(n) ? n : d }
+const isExpiredToken = (m: string) => /token is expired|invalid user token/i.test(m)
+const parseJwt = (t: string) => {
+    try {
+        const b = t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
+        return JSON.parse(decodeURIComponent(window.atob(b).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('')))
+    } catch { return null }
+}
+const getCurrentUserId = () => {
+    // Prefer minion user_id from API response (matches comment.UserId)
+    if (currentMinionUserId > 0) {
+        return currentMinionUserId
+    }
+    // Fallback to JWT user_id (may not match minion's user_id for same email across providers)
+    const t = getStoredAuthToken()
+    if (!t) return 0
+    const p = parseJwt(t)
+    if (!p) return 0
+    const userId = toNum(p.user_id ?? p.userId ?? p.sub ?? p.id ?? p.uid)
+    console.log("[comments] getCurrentUserId from JWT (fallback):", { user_id: p.user_id, userId: p.userId, sub: p.sub, id: p.id, uid: p.uid, result: userId })
+    return userId
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-    const globals = (window as any).globals as Globals
-    const endpoint = globals.comments_endpoint || "/api-comments"
-    const commentsSection = document.querySelector(".comments") as HTMLElement | null
-    const i18nReplyingTo = commentsSection?.getAttribute("data-i18n-replying-to") || "Replying to"
-    const i18nNoComments = commentsSection?.getAttribute("data-i18n-no-comments") || "No comments yet."
-    const i18nMoreReplies = commentsSection?.getAttribute("data-i18n-more-replies") || "More {count} replies"
-    const i18nLoading = commentsSection?.getAttribute("data-i18n-loading") || "Loading..."
-    const i18nCommentDeleted = commentsSection?.getAttribute("data-i18n-comment-deleted") || "Comment deleted"
-    const i18nDeleteConfirm = commentsSection?.getAttribute("data-i18n-delete-confirm") || "Delete this comment?"
-    const currentSiteId = toNumber(commentsSection?.getAttribute("data-site-id"), 0)
-    const INITIAL_VISIBLE_REPLIES = 2
-    const LOAD_MORE_BATCH = 5
-    const MAX_INDENT = 9
-    const MAX_SIBLINGS = 1000
+const i18n = (() => {
+    const s = $(".comments")
+    const get = (k: string, d: string) => attr(s, `data-i18n-${k}`) || d
+    return {
+        replyingTo: get("replying-to", "Replying to"),
+        noComments: get("no-comments", "No comments yet."),
+        loading: get("loading", "Loading..."),
+        deleted: get("comment-deleted", "Comment deleted"),
+        deleteConfirm: get("delete-confirm", "Delete this comment?"),
+        reply: get("reply", "Reply"),
+    }
+})()
 
-    function parseJwt(token: string): Record<string, any> | null {
-        try {
-            const base64Url = token.split('.')[1]
-            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/')
-            const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function (c) {
-                return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
-            }).join(''))
-            return JSON.parse(jsonPayload)
-        } catch {
-            return null
-        }
+const api = {
+    headers: (withToken = true): HeadersInit => {
+        const h: HeadersInit = { "Content-Type": "application/json" }
+        const t = withToken && getStoredAuthToken()
+        if (t) h["X-Comment-Token"] = t
+        return h
+    },
+    get: async (path: string, params: Record<string, any> = {}) => {
+        const qs = new URLSearchParams()
+        Object.keys(params).forEach((k) => {
+            qs.append(k, String(params[k]))
+        })
+        return fetch(`${endpoint}${path}?${qs}`, { headers: api.headers() })
+    },
+    post: async (path: string, body?: any) => fetch(`${endpoint}${path}`, {
+        method: "POST", headers: api.headers(), body: body ? JSON.stringify(body) : undefined
+    }),
+}
+
+async function requestWithAuthRetry(url: string, init: RequestInit): Promise<any> {
+    const makeReq = async () => {
+        const r = await fetch(url, init)
+        const j = await r.json().catch(() => null)
+        return { r, j }
     }
 
-    function getCurrentUserId(): number {
-        const token = getStoredAuthToken()
-        if (!token) return 0
-        const payload = parseJwt(token)
-        if (!payload) return 0
-        // Try common JWT user_id fields: user_id, sub, id
-        return toNumber(payload.user_id ?? payload.sub ?? payload.id, 0)
-    }
+    let { r, j } = await makeReq()
+    if (r.ok && (!j || j.success !== false)) return j
 
-    // Global admin state, updated from API responses
-    let isCurrentUserAdminFlag = false
+    const err = String(j?.error || j?.value || `HTTP ${r.status}`)
+    if (!isExpiredToken(err)) throw new Error(err)
 
-    // Helper to find parent comment container
-    function getCommentContainer(el: Element): Element | null {
-        return el.closest(".comment-container")
-    }
+    const prevToken = getStoredAuthToken()
+    localStorage.removeItem("comment_token")
+    sessionStorage.removeItem("comment_token")
+    document.cookie = "comment_token=; path=/; max-age=0"
 
-    function getEventTargetElement(target: EventTarget | null): Element | null {
-        if (!target) return null
-        if (target instanceof Element) return target
-        if (target instanceof Node) return target.parentElement
-        return null
-    }
-
-    function clearAuthToken() {
-        try {
-            localStorage.removeItem("comment_token")
-            sessionStorage.removeItem("comment_token")
-            document.cookie = "comment_token=; path=/; max-age=0"
-        } catch {
-        }
-    }
-
-    function isExpiredTokenError(message: string): boolean {
-        const lower = (message || "").toLowerCase()
-        return lower.includes("token is expired") || lower.includes("invalid user token")
-    }
-
-    let loginWaitPromise: Promise<string | null> | null = null
-
-    function waitForTokenAfterLogin(previousToken: string | null): Promise<string | null> {
-        if (loginWaitPromise) return loginWaitPromise
+    if (!loginWaitPromise) {
         login()
-        loginWaitPromise = new Promise((resolve) => {
-            const startedAt = Date.now()
-            const timeoutMs = 120000
-            const interval = window.setInterval(() => {
-                const token = getStoredAuthToken()
-                if (token && token !== previousToken) {
-                    window.clearInterval(interval)
-                    loginWaitPromise = null
-                    resolve(token)
-                    return
-                }
-                if (Date.now() - startedAt > timeoutMs) {
-                    window.clearInterval(interval)
-                    loginWaitPromise = null
-                    resolve(null)
-                }
+        loginWaitPromise = new Promise((res) => {
+            const start = Date.now()
+            const iv = setInterval(() => {
+                const t = getStoredAuthToken()
+                if (t && t !== prevToken) { clearInterval(iv); loginWaitPromise = null; res(t) }
+                else if (Date.now() - start > 120000) { clearInterval(iv); loginWaitPromise = null; res(null) }
             }, 400)
         })
-        return loginWaitPromise
+    }
+    const newToken = await loginWaitPromise
+    if (!newToken) throw new Error("Login required")
+
+    const h = new Headers(init.headers || {})
+    h.set("X-Comment-Token", newToken)
+    if (!h.has("Content-Type")) h.set("Content-Type", "application/json")
+
+    const retry = await fetch(url, { ...init, headers: h })
+    const retryJ = await retry.json().catch(() => null)
+    if (retry.ok && (!retryJ || retryJ.success !== false)) return retryJ
+    throw new Error(String(retryJ?.error || retryJ?.value || `HTTP ${retry.status}`))
+}
+
+interface Comment {
+    CommentId: number; SiteId: number; ParentId: number; Indent: number; ReplyCount: number
+    Avatar: string; Username: string; ReplyToUsername: string; Text: string
+    Likes: number; Dislikes: number; IsLiked: boolean; IsDisliked: boolean
+    Status: string; UserId: number; Created: string
+}
+
+function normalizeComment(raw: Record<string, any>, fallback: Partial<Comment> = {}): Comment {
+    const parentId = toNum(raw?.ParentId ?? raw?.parent_id ?? fallback.ParentId)
+    return {
+        CommentId: toNum(raw?.CommentId ?? raw?.comment_id ?? fallback.CommentId),
+        SiteId: toNum(raw?.SiteId ?? raw?.site_id ?? fallback.SiteId),
+        ParentId: parentId,
+        Indent: toNum(raw?.Indent ?? raw?.indent ?? fallback.Indent, parentId > 0 ? 1 : 0),
+        ReplyCount: toNum(raw?.ReplyCount ?? raw?.reply_count ?? fallback.ReplyCount),
+        Avatar: String(raw?.Avatar ?? raw?.avatar ?? fallback.Avatar ?? ""),
+        Username: String(raw?.Username ?? raw?.username ?? fallback.Username ?? ""),
+        ReplyToUsername: String(raw?.ReplyToUsername ?? raw?.reply_to_username ?? fallback.ReplyToUsername ?? ""),
+        Text: String(raw?.Text ?? raw?.text ?? fallback.Text ?? ""),
+        Likes: toNum(raw?.Likes ?? raw?.likes ?? fallback.Likes),
+        Dislikes: toNum(raw?.Dislikes ?? raw?.dislikes ?? fallback.Dislikes),
+        IsLiked: Boolean(raw?.IsLiked ?? raw?.is_liked ?? fallback.IsLiked),
+        IsDisliked: Boolean(raw?.IsDisliked ?? raw?.is_disliked ?? fallback.IsDisliked),
+        Status: String(raw?.Status ?? raw?.status ?? fallback.Status ?? "approved"),
+        UserId: toNum(raw?.UserId ?? raw?.user_id ?? fallback.UserId),
+        Created: String(raw?.Created ?? raw?.created ?? fallback.Created ?? ""),
+    }
+}
+
+const formatDate = (dateStr: string) => {
+    if (!dateStr) return ""
+    try {
+        const d = new Date(dateStr)
+        if (isNaN(d.getTime())) return ""
+        const lang = globals.lang || "en"
+        const date = new Intl.DateTimeFormat(lang, { day: "2-digit", month: "2-digit", year: "numeric" }).format(d)
+        const time = new Intl.DateTimeFormat(lang, { hour: "2-digit", minute: "2-digit" }).format(d)
+        return `${date}${lang.startsWith("ru") ? " в " : " at "}${time}`
+    } catch { return "" }
+}
+
+const template = $("#comment-template-js") as HTMLTemplateElement | null
+
+function renderComment(c: Comment): HTMLElement {
+    const frag = template?.content.cloneNode(true) as DocumentFragment
+    const li = frag?.querySelector("li") as HTMLElement
+    const container = li?.querySelector(".comment-container") as HTMLElement
+    if (!li || !container) throw new Error("Template not found")
+
+    const id = Math.max(0, c.CommentId) || `tmp-${Date.now()}-${Math.random() * 1000 | 0}`
+    const isDeleted = c.Status === "deleted"
+    const currentUserId = getCurrentUserId()
+    const isOwner = currentUserId > 0 && c.UserId > 0 && currentUserId === c.UserId
+
+    container.dataset.commentId = String(c.CommentId || 0)
+    container.id = `comment-${id}`
+    container.dataset.parentId = String(c.ParentId || 0)
+    container.dataset.replyCount = String(c.ReplyCount || 0)
+    container.dataset.indent = String(c.Indent || 0)
+    container.dataset.status = c.Status || "approved"
+    container.dataset.userId = String(c.UserId || 0)
+    container.style.setProperty("--comment-indent", String(c.Indent || 0))
+    container.classList.toggle("is-reply", c.ParentId > 0)
+    if (isDeleted) container.classList.add("comment-deleted")
+
+    const avatar = $(".avatar img", container) as HTMLImageElement
+    if (!isDeleted && c.Avatar && avatar) { avatar.src = c.Avatar; avatar.alt = c.Username }
+
+    const username = $(".comment-username", container)
+    const date = $(".comment-date", container)
+    if (username) username.textContent = isDeleted ? "" : c.Username
+    if (date) date.textContent = isDeleted ? "" : formatDate(c.Created)
+
+    const context = $(".comment-context", container)
+    if (context && c.ParentId > 0 && !isDeleted) {
+        const replyTo = c.ReplyToUsername || $(`.comment-container[data-comment-id="${c.ParentId}"] .comment-username`)?.textContent?.trim() || ""
+        if (replyTo) container.dataset.replyToUsername = replyTo
+        context.innerHTML = `<a class="comment-parent-link" href="#comment-${c.ParentId}" title="${i18n.replyingTo} ${replyTo}">
+      <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="3" fill="none"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+    </a>`
+        context.classList.remove("hidden")
+    } else if (context) {
+        context.textContent = ""
+        context.classList.add("hidden")
     }
 
-    async function requestJsonWithAuthRetry(url: string, init: RequestInit): Promise<any> {
-        const makeRequest = async (requestInit: RequestInit) => {
-            const response = await fetch(url, requestInit)
-            let json: any = null
-            try {
-                json = await response.json()
-            } catch {
-            }
-            return { response, json }
+    const text = $(".comment-text", container)
+    if (text) text.textContent = isDeleted ? i18n.deleted : c.Text
+
+    const actions = $(".comment-actions", container)
+    const replyBox = $(".comment-reply", container)
+
+    if (isDeleted) {
+        actions?.classList.add("hidden")
+        replyBox?.classList.add("hidden")
+    } else {
+        const permalink = $(".comment-permalink", container) as HTMLAnchorElement
+        if (permalink) { permalink.href = `#comment-${id}`; permalink.textContent = "#" }
+
+        $(".like-button", container)?.classList.toggle("active", c.IsLiked)
+        $(".dislike-button", container)?.classList.toggle("active", c.IsDisliked)
+
+        // Hide like/dislike buttons for own comments
+        if (isOwner) {
+            $(".like-button", container)?.classList.add("hidden")
+            $(".dislike-button", container)?.classList.add("hidden")
         }
 
-        const { response, json } = await makeRequest(init)
-        if (response.ok && (!json || json.success !== false)) {
-            return json
+        const score = $(".score-count", container)
+        if (score) score.textContent = String(c.Likes - c.Dislikes)
+
+        const replyBtn = $(".reply-button", container)
+        const isCrossSite = toNum($(`.comments`)?.dataset.siteId) > 0 && c.SiteId > 0 && c.SiteId !== toNum($(`.comments`)?.dataset.siteId)
+        if (replyBtn && (c.Indent >= MAX_INDENT || isCrossSite)) {
+            replyBtn.classList.add("hidden")
+            replyBox?.classList.add("hidden")
+        } else if (replyBtn) {
+            replyBtn.innerHTML = `<span>${i18n.reply}</span>`
         }
 
-        const errorMessage = String(json?.error || json?.value || `HTTP ${response.status}`)
-        if (!isExpiredTokenError(errorMessage)) {
-            throw new Error(errorMessage)
-        }
-
-        const previousToken = getStoredAuthToken()
-        clearAuthToken()
-        const refreshedToken = await waitForTokenAfterLogin(previousToken)
-        if (!refreshedToken) {
-            throw new Error("Login required")
-        }
-
-        const retryHeaders = new Headers(init.headers || {})
-        retryHeaders.set("X-Comment-Token", refreshedToken)
-        if (!retryHeaders.has("Content-Type")) {
-            retryHeaders.set("Content-Type", "application/json")
-        }
-
-        const retried = await makeRequest({ ...init, headers: retryHeaders })
-        if (retried.response.ok && (!retried.json || retried.json.success !== false)) {
-            return retried.json
-        }
-
-        throw new Error(String(retried.json?.error || retried.json?.value || `HTTP ${retried.response.status}`))
+        const delBtn = $(".delete-button", container)
+        if (delBtn && (isOwner || isCurrentUserAdminFlag)) delBtn.classList.remove("hidden")
     }
 
-    const template = document.getElementById("comment-template-js") as HTMLTemplateElement
+    return li
+}
 
-    interface Comment {
-        CommentId: number
-        SiteId: number
-        ParentId: number
-        Indent: number
-        ReplyCount: number
-        Avatar: string
-        Username: string
-        ReplyToUsername: string
-        Text: string
-        Likes: number
-        Dislikes: number
-        IsLiked: boolean
-        IsDisliked: boolean
-        Status: string
-        UserId: number
+function getParentMeta(container: HTMLElement) {
+    return {
+        parentId: toNum(container.dataset.commentId),
+        parentIndent: toNum(container.dataset.indent),
+        totalReplies: toNum(container.dataset.replyCount),
+        directReplyTotal: container.dataset.directReplyTotal === undefined ? -1 : toNum(container.dataset.directReplyTotal, -1),
     }
+}
 
-    type RawComment = Record<string, any>
+function findThreadAnchor(parentLi: HTMLElement, parentContainer: HTMLElement): HTMLElement {
+    const parentIndent = toNum(parentContainer.dataset.indent)
+    let anchor: HTMLElement = parentLi
+    let cursor = parentLi.nextElementSibling as HTMLElement | null
 
-    function toNumber(value: any, fallback = 0): number {
-        const num = Number(value)
-        return Number.isFinite(num) ? num : fallback
-    }
-
-    function normalizeComment(raw: RawComment, fallback: Partial<Comment> = {}): Comment {
-        const parentId = toNumber(raw?.ParentId ?? raw?.parent_id ?? fallback.ParentId, 0)
-        return {
-            CommentId: toNumber(raw?.CommentId ?? raw?.comment_id ?? fallback.CommentId, 0),
-            SiteId: toNumber(raw?.SiteId ?? raw?.site_id ?? fallback.SiteId, 0),
-            ParentId: parentId,
-            Indent: toNumber(raw?.Indent ?? raw?.indent ?? fallback.Indent, parentId > 0 ? 1 : 0),
-            ReplyCount: toNumber(raw?.ReplyCount ?? raw?.reply_count ?? fallback.ReplyCount, 0),
-            Avatar: String(raw?.Avatar ?? raw?.avatar ?? fallback.Avatar ?? ""),
-            Username: String(raw?.Username ?? raw?.username ?? fallback.Username ?? ""),
-            ReplyToUsername: String(raw?.ReplyToUsername ?? raw?.reply_to_username ?? fallback.ReplyToUsername ?? ""),
-            Text: String(raw?.Text ?? raw?.text ?? fallback.Text ?? ""),
-            Likes: toNumber(raw?.Likes ?? raw?.likes ?? fallback.Likes, 0),
-            Dislikes: toNumber(raw?.Dislikes ?? raw?.dislikes ?? fallback.Dislikes, 0),
-            IsLiked: Boolean(raw?.IsLiked ?? raw?.is_liked ?? fallback.IsLiked),
-            IsDisliked: Boolean(raw?.IsDisliked ?? raw?.is_disliked ?? fallback.IsDisliked),
-            Status: String(raw?.Status ?? raw?.status ?? fallback.Status ?? "approved"),
-            UserId: toNumber(raw?.UserId ?? raw?.user_id ?? fallback.UserId, 0),
-        }
-    }
-
-    function resolveReplyUsername(comment: Comment): string {
-        if (comment.ReplyToUsername) return comment.ReplyToUsername
-        const parentContainer = document.getElementById(`comment-${comment.ParentId}`)
-        if (!parentContainer) return ""
-
-        const parentName = parentContainer.querySelector(".comment-username")
-        return parentName?.textContent?.trim() || ""
-    }
-
-    function renderComment(comment: Comment): Element {
-        const clone = template.content.cloneNode(true) as DocumentFragment
-        const li = clone.querySelector("li") as HTMLElement
-        const container = li.querySelector(".comment-container") as HTMLElement
-
-        const commentId = Math.max(0, toNumber(comment.CommentId, 0))
-        const domCommentId = commentId > 0 ? commentId.toString() : `tmp-${Date.now()}-${Math.floor(Math.random() * 1000)}`
-        container.setAttribute("data-comment-id", commentId.toString())
-        container.id = `comment-${domCommentId}`
-        container.setAttribute("data-parent-id", (comment.ParentId || 0).toString())
-        container.setAttribute("data-reply-count", toNumber(comment.ReplyCount, 0).toString())
-        container.setAttribute("data-indent", comment.Indent.toString())
-        container.setAttribute("data-status", comment.Status || "approved")
-        container.setAttribute("data-user-id", (comment.UserId || 0).toString())
-        container.style.setProperty("--comment-indent", comment.Indent.toString())
-        container.classList.toggle("is-reply", comment.ParentId > 0)
-
-        const isDeleted = comment.Status === "deleted"
-        if (isDeleted) {
-            container.classList.add("comment-deleted")
-        }
-
-        const avatarImg = container.querySelector(".avatar img") as HTMLImageElement
-        if (!isDeleted && comment.Avatar) {
-            avatarImg.src = comment.Avatar
-            avatarImg.alt = comment.Username
-        } // else placeholder is already there
-
-        container.querySelector(".comment-username")!.textContent = isDeleted ? "" : comment.Username
-        const contextEl = container.querySelector(".comment-context") as HTMLElement
-        if (comment.ParentId > 0 && !isDeleted) {
-            const replyToName = resolveReplyUsername(comment)
-            if (replyToName) {
-                container.setAttribute("data-reply-to-username", replyToName)
-            }
-            contextEl.textContent = ""
-            contextEl.append(document.createTextNode(`${i18nReplyingTo} `))
-            const parentLink = document.createElement("a")
-            parentLink.className = "comment-parent-link"
-            parentLink.href = `#comment-${comment.ParentId}`
-            parentLink.textContent = replyToName ? `@${replyToName}` : `#${comment.ParentId}`
-            contextEl.append(parentLink)
-            contextEl.classList.remove("hidden")
-        } else {
-            contextEl.textContent = ""
-            contextEl.classList.add("hidden")
-        }
-
-        container.querySelector(".comment-text")!.textContent = isDeleted ? i18nCommentDeleted : comment.Text
-
-        const actionsEl = container.querySelector(".comment-actions") as HTMLElement
-        const replyBoxEl = container.querySelector(".comment-reply") as HTMLElement
-
-        if (isDeleted) {
-            // Hide actions and reply box for deleted comments
-            if (actionsEl) actionsEl.classList.add("hidden")
-            if (replyBoxEl) replyBoxEl.classList.add("hidden")
-        } else {
-            const permalink = container.querySelector(".comment-permalink") as HTMLAnchorElement
-            permalink.href = `#comment-${domCommentId}`
-            permalink.textContent = "#"
-
-            const likeBtn = container.querySelector(".like-button") as HTMLElement
-            if (comment.IsLiked) likeBtn.classList.add("active")
-
-            const scoreCount = container.querySelector(".score-count") as HTMLElement
-            if (scoreCount) {
-                scoreCount.textContent = (comment.Likes - comment.Dislikes).toString()
-            }
-
-            const dislikeBtn = container.querySelector(".dislike-button") as HTMLElement
-            if (comment.IsDisliked) dislikeBtn.classList.add("active")
-
-            const replyBtn = container.querySelector(".reply-button") as HTMLElement
-            if (replyBtn) {
-                const isCrossSite = currentSiteId > 0 && comment.SiteId > 0 && comment.SiteId !== currentSiteId
-                if (comment.Indent >= MAX_INDENT || isCrossSite) {
-                    replyBtn.classList.add("hidden")
-                    container.querySelector(".comment-reply")?.classList.add("hidden")
-                }
-            }
-
-            // Show delete button if user owns this comment or is admin
-            const deleteBtn = container.querySelector(".delete-button") as HTMLElement
-            if (deleteBtn) {
-                const currentUserId = getCurrentUserId()
-                const isOwner = currentUserId > 0 && comment.UserId > 0 && currentUserId === comment.UserId
-                const isAdmin = isCurrentUserAdminFlag
-                if (isOwner || isAdmin) {
-                    deleteBtn.classList.remove("hidden")
-                }
-            }
-        }
-
-        return li
-    }
-
-    function findThreadInsertAnchor(parentLi: Element, parentContainer: Element): Element {
-        const parentIndent = Number(parentContainer.getAttribute("data-indent") || "0")
-
-        let anchor = parentLi
-        let cursor = parentLi.nextElementSibling
-
-        while (cursor) {
-            const cursorContainer = cursor.querySelector(".comment-container")
-            if (!cursorContainer) {
-                // Keep service rows (like "more replies") inside subtree traversal.
-                if ((cursor as HTMLElement).classList.contains("comment-more-item")) {
-                    const moreParentId = toNumber((cursor as HTMLElement).getAttribute("data-parent-id"), 0)
-                    const moreParent = moreParentId > 0
-                        ? document.querySelector(`.comment-container[data-comment-id="${moreParentId}"]`) as HTMLElement | null
-                        : null
-                    const moreIndent = moreParent ? toNumber(moreParent.getAttribute("data-indent"), 0) + 1 : parentIndent + 1
-                    if (moreIndent <= parentIndent) break
-                    anchor = cursor
-                    cursor = cursor.nextElementSibling
-                    continue
-                }
-                cursor = cursor.nextElementSibling
-                continue
-            }
-
-            const cursorIndent = Number(cursorContainer.getAttribute("data-indent") || "0")
-            if (cursorIndent <= parentIndent) break
-
-            anchor = cursor
-            cursor = cursor.nextElementSibling
-        }
-
-        return anchor
-    }
-
-    function getParentMeta(parentContainer: Element) {
-        const parentId = toNumber(parentContainer.getAttribute("data-comment-id"), 0)
-        const parentIndent = toNumber(parentContainer.getAttribute("data-indent"), 0)
-        const totalReplies = toNumber(parentContainer.getAttribute("data-reply-count"), 0) // descendants total
-        const directReplyTotalRaw = parentContainer.getAttribute("data-direct-reply-total")
-        const directReplyTotal = directReplyTotalRaw === null ? -1 : toNumber(directReplyTotalRaw, -1)
-        return { parentId, parentIndent, totalReplies, directReplyTotal }
-    }
-
-    function getDirectChildLis(parentLi: Element, parentContainer: Element): HTMLElement[] {
-        const { parentId, parentIndent } = getParentMeta(parentContainer)
-        const children: HTMLElement[] = []
-        let cursor = parentLi.nextElementSibling as HTMLElement | null
-        while (cursor) {
-            const c = cursor.querySelector(".comment-container") as HTMLElement | null
-            if (!c) {
+    while (cursor) {
+        const c = $(".comment-container", cursor)
+        if (!c) {
+            if (cursor.classList.contains("comment-more-item")) {
+                const moreParentId = toNum(cursor.dataset.parentId)
+                const moreParent = moreParentId > 0 ? $(`.comment-container[data-comment-id="${moreParentId}"]`) : null
+                const moreIndent = moreParent ? toNum(moreParent.dataset.indent) + 1 : parentIndent + 1
+                if (moreIndent <= parentIndent) break
+                anchor = cursor
                 cursor = cursor.nextElementSibling as HTMLElement | null
                 continue
-            }
-            const indent = toNumber(c.getAttribute("data-indent"), 0)
-            if (indent <= parentIndent) break
-            const cParentId = toNumber(c.getAttribute("data-parent-id"), 0)
-            if (cParentId === parentId) {
-                children.push(cursor)
             }
             cursor = cursor.nextElementSibling as HTMLElement | null
+            continue
         }
-        return children
+        const indent = toNum(c.dataset.indent)
+        if (indent <= parentIndent) break
+        anchor = cursor
+        cursor = cursor.nextElementSibling as HTMLElement | null
     }
+    return anchor
+}
 
-    function setSubtreeVisibility(commentLi: Element, visible: boolean) {
-        const commentContainer = commentLi.querySelector(".comment-container") as HTMLElement | null
-        if (!commentContainer) return
-        const rootIndent = toNumber(commentContainer.getAttribute("data-indent"), 0)
-        let cursor: Element | null = commentLi
-        while (cursor) {
-            const c = cursor.querySelector(".comment-container") as HTMLElement | null
-            if (!c) {
-                const li = cursor as HTMLElement
-                if (li.classList.contains("comment-more-item")) {
-                    const moreParentId = toNumber(li.getAttribute("data-parent-id"), 0)
-                    const moreParent = moreParentId > 0
-                        ? document.querySelector(`.comment-container[data-comment-id="${moreParentId}"]`) as HTMLElement | null
-                        : null
-                    const moreIndent = moreParent ? toNumber(moreParent.getAttribute("data-indent"), 0) + 1 : rootIndent + 1
-                    if (cursor !== commentLi && moreIndent <= rootIndent) break
-                    li.style.display = visible ? "" : "none"
-                    cursor = cursor.nextElementSibling
-                    continue
-                }
-                cursor = cursor.nextElementSibling
+function getDirectChildren(parentLi: HTMLElement, parentContainer: HTMLElement): HTMLElement[] {
+    const { parentId, parentIndent } = getParentMeta(parentContainer)
+    const children: HTMLElement[] = []
+    let cursor = parentLi.nextElementSibling as HTMLElement | null
+
+    while (cursor) {
+        const c = $(".comment-container", cursor)
+        if (!c) { cursor = cursor.nextElementSibling as HTMLElement | null; continue }
+        const indent = toNum(c.dataset.indent)
+        if (indent <= parentIndent) break
+        if (toNum(c.dataset.parentId) === parentId) children.push(cursor)
+        cursor = cursor.nextElementSibling as HTMLElement | null
+    }
+    return children
+}
+
+function setSubtreeVisibility(commentLi: HTMLElement, visible: boolean) {
+    const container = $(".comment-container", commentLi)
+    if (!container) return
+    const rootIndent = toNum(container.dataset.indent)
+    let cursor: HTMLElement | null = commentLi
+
+    while (cursor) {
+        const c = $(".comment-container", cursor)
+        if (!c) {
+            const li = cursor
+            if (li.classList.contains("comment-more-item")) {
+                const moreParentId = toNum(li.dataset.parentId)
+                const moreParent = moreParentId > 0 ? $(`.comment-container[data-comment-id="${moreParentId}"]`) : null
+                const moreIndent = moreParent ? toNum(moreParent.dataset.indent) + 1 : rootIndent + 1
+                if (cursor !== commentLi && moreIndent <= rootIndent) break
+                li.style.display = visible ? "" : "none"
+                cursor = cursor.nextElementSibling as HTMLElement | null
                 continue
             }
-            const indent = toNumber(c.getAttribute("data-indent"), 0)
-            if (cursor !== commentLi && indent <= rootIndent) break
-                ; (cursor as HTMLElement).style.display = visible ? "" : "none"
-            cursor = cursor.nextElementSibling
+            cursor = cursor.nextElementSibling as HTMLElement | null
+            continue
         }
+        const indent = toNum(c.dataset.indent)
+        if (cursor !== commentLi && indent <= rootIndent) break
+        cursor.style.display = visible ? "" : "none"
+        cursor = cursor.nextElementSibling as HTMLElement | null
+    }
+}
+
+function getOrCreateMoreRepliesLi(parentLi: HTMLElement, parentContainer: HTMLElement): HTMLElement {
+    const { parentId } = getParentMeta(parentContainer)
+    const parentIndent = toNum(parentContainer.dataset.indent)
+    const anchor = findThreadAnchor(parentLi, parentContainer)
+    const existing = $(`.comment-more-item[data-parent-id="${parentId}"]`)
+
+    if (existing) {
+        if (existing.previousElementSibling !== anchor) anchor.insertAdjacentElement("afterend", existing)
+        return existing
     }
 
-    function getOrCreateMoreRepliesLi(parentLi: Element, parentContainer: Element): HTMLLIElement {
-        const { parentId } = getParentMeta(parentContainer)
-        const parentIndent = toNumber(parentContainer.getAttribute("data-indent"), 0)
-        const anchor = findThreadInsertAnchor(parentLi, parentContainer)
-        const existingAny = document.querySelector(`.comment-more-item[data-parent-id="${parentId}"]`) as HTMLLIElement | null
-        if (existingAny) {
-            // Keep control at the correct place (after current subtree end).
-            if (existingAny.previousElementSibling !== anchor) {
-                anchor.insertAdjacentElement("afterend", existingAny)
-            }
-            return existingAny
-        }
+    const moreLi = document.createElement("li")
+    moreLi.className = "comment-more-item"
+    moreLi.dataset.parentId = String(parentId)
+    moreLi.style.marginInlineStart = `calc(${parentIndent + 1} * var(--comment-indent-step))`
+    moreLi.innerHTML = `<button type="button" class="comment-more-btn" data-parent-id="${parentId}"></button>`
+    anchor.insertAdjacentElement("afterend", moreLi)
+    return moreLi
+}
 
-        const moreLi = document.createElement("li")
-        moreLi.className = "comment-more-item"
-        moreLi.setAttribute("data-parent-id", parentId.toString())
-        moreLi.style.marginInlineStart = `calc(${parentIndent + 1} * var(--comment-indent-step))`
+function updateMoreRepliesControl(parentLi: HTMLElement, parentContainer: HTMLElement) {
+    const { parentId, totalReplies, parentIndent, directReplyTotal } = getParentMeta(parentContainer)
+    const allDirect = getDirectChildren(parentLi, parentContainer)
+    const hiddenDirect = allDirect.filter(li => li.style.display === "none")
 
-        const button = document.createElement("button")
-        button.type = "button"
-        button.className = "comment-more-btn"
-        button.setAttribute("data-parent-id", parentId.toString())
-        moreLi.appendChild(button)
-
-        anchor.insertAdjacentElement("afterend", moreLi)
-        return moreLi
+    let visibleDescendants = 0
+    let cursor = parentLi.nextElementSibling as HTMLElement | null
+    while (cursor) {
+        const c = $(".comment-container", cursor)
+        if (!c) { cursor = cursor.nextElementSibling as HTMLElement | null; continue }
+        const indent = toNum(c.dataset.indent)
+        if (indent <= parentIndent) break
+        if (cursor.style.display !== "none") visibleDescendants++
+        cursor = cursor.nextElementSibling as HTMLElement | null
     }
 
-    function updateMoreRepliesControl(parentLi: Element, parentContainer: Element) {
-        const { parentId, totalReplies, parentIndent, directReplyTotal } = getParentMeta(parentContainer)
-        const allDirectChildren = getDirectChildLis(parentLi, parentContainer)
-        const visibleDirectChildren = allDirectChildren.filter((li) => (li as HTMLElement).style.display !== "none")
-        const hiddenDirectChildren = allDirectChildren.filter((li) => (li as HTMLElement).style.display === "none")
-        const visibleDescendants = (() => {
-            let count = 0
-            let cursor = parentLi.nextElementSibling as HTMLElement | null
-            while (cursor) {
-                const c = cursor.querySelector(".comment-container") as HTMLElement | null
-                if (!c) {
-                    cursor = cursor.nextElementSibling as HTMLElement | null
-                    continue
-                }
-                const indent = toNumber(c.getAttribute("data-indent"), 0)
-                if (indent <= parentIndent) break
-                if ((cursor as HTMLElement).style.display !== "none") {
-                    count++
-                }
-                cursor = cursor.nextElementSibling as HTMLElement | null
-            }
-            return count
-        })()
-
-        if (totalReplies <= 0 && hiddenDirectChildren.length <= 0) {
-            const existing = document.querySelector(`.comment-more-item[data-parent-id="${parentId}"]`) as HTMLElement | null
-            if (existing) {
-                existing.remove()
-            }
-            return
-        }
-
-        let remainingDirect = 0
-        if (directReplyTotal >= 0) {
-            remainingDirect = Math.max(0, directReplyTotal - visibleDirectChildren.length)
-        } else {
-            // Before first /thread call, direct total is unknown.
-            // If there are hidden direct comments, reveal them first.
-            if (hiddenDirectChildren.length > 0) {
-                remainingDirect = hiddenDirectChildren.length
-            } else if (totalReplies > visibleDescendants) {
-                // There are more descendants than currently visible; allow one probing load.
-                remainingDirect = 1
-            }
-        }
-
-        const remainingDescendants = Math.max(0, totalReplies - visibleDescendants)
-        if ((remainingDirect <= 0 && remainingDescendants <= 0) || visibleDirectChildren.length >= MAX_SIBLINGS) {
-            const existing = document.querySelector(`.comment-more-item[data-parent-id="${parentId}"]`) as HTMLElement | null
-            if (existing) {
-                existing.remove()
-            }
-            return
-        }
-
-        const moreLi = getOrCreateMoreRepliesLi(parentLi, parentContainer)
-        const labelCount = Math.max(remainingDirect, remainingDescendants)
-        moreLi.setAttribute("data-remaining", labelCount.toString())
-        moreLi.setAttribute("data-hidden-direct", hiddenDirectChildren.length.toString())
-
-        const btn = moreLi.querySelector(".comment-more-btn") as HTMLButtonElement
-        btn.innerHTML = `
-            <svg viewBox="0 0 24 24" class="icon-more-replies">
-                <path fill="currentColor" d="M16.59 8.59L12 13.17 7.41 8.59 6 10l6 6 6-6z"/>
-            </svg>
-            <span>${labelCount}</span>
-        `
+    if (totalReplies <= 0 && hiddenDirect.length <= 0) {
+        $(`.comment-more-item[data-parent-id="${parentId}"]`)?.remove()
+        return
     }
 
-    function collapseInitialReplies() {
-        const allLis = Array.from(document.querySelectorAll(".comments > ul > li"))
-        for (const li of allLis) {
-            const parentContainer = li.querySelector(".comment-container") as HTMLElement | null
-            if (!parentContainer) continue
-            const directChildren = getDirectChildLis(li, parentContainer)
-            const totalReplies = toNumber(parentContainer.getAttribute("data-reply-count"), 0)
-            if (directChildren.length <= INITIAL_VISIBLE_REPLIES && totalReplies <= INITIAL_VISIBLE_REPLIES) continue
-
-            for (let i = INITIAL_VISIBLE_REPLIES; i < directChildren.length; i++) {
-                setSubtreeVisibility(directChildren[i], false)
-            }
-            updateMoreRepliesControl(li, parentContainer)
-        }
+    let remainingDirect = 0
+    if (directReplyTotal >= 0) {
+        remainingDirect = Math.max(0, directReplyTotal - allDirect.filter(li => li.style.display !== "none").length)
+    } else if (hiddenDirect.length > 0) {
+        remainingDirect = hiddenDirect.length
+    } else if (totalReplies > visibleDescendants) {
+        remainingDirect = 1
     }
 
-    function focusNewComment(commentLi: Element) {
-        const commentContainer = commentLi.querySelector(".comment-container") as HTMLElement | null
-        if (!commentContainer || !commentContainer.id) return
-
-        const newHash = `#${commentContainer.id}`
-        if (window.location.hash !== newHash) {
-            window.history.replaceState({}, document.title, newHash)
-        }
-
-        commentContainer.setAttribute("tabindex", "-1")
-        commentContainer.scrollIntoView({ behavior: "smooth", block: "center" })
-        try {
-            commentContainer.focus({ preventScroll: true })
-        } catch {
-            commentContainer.focus()
-        }
+    const remainingDescendants = Math.max(0, totalReplies - visibleDescendants)
+    if ((remainingDirect <= 0 && remainingDescendants <= 0) || allDirect.filter(li => li.style.display !== "none").length >= MAX_SIBLINGS) {
+        $(`.comment-more-item[data-parent-id="${parentId}"]`)?.remove()
+        return
     }
 
-    function getReactionState(container: Element) {
-        const likeBtn = container.querySelector(".like-button, .like-button-alt") as HTMLElement | null
-        const dislikeBtn = container.querySelector(".dislike-button, .dislike-button-alt") as HTMLElement | null
-        const scoreEl = container.querySelector(".score-count") as HTMLElement | null
+    const moreLi = getOrCreateMoreRepliesLi(parentLi, parentContainer)
+    const count = Math.max(remainingDirect, remainingDescendants)
+    moreLi.dataset.remaining = String(count)
+    moreLi.dataset.hiddenDirect = String(hiddenDirect.length)
 
-        return {
-            likeBtn,
-            dislikeBtn,
-            scoreEl,
-            isLiked: !!likeBtn?.classList.contains("active"),
-            isDisliked: !!dislikeBtn?.classList.contains("active"),
-            score: Number(scoreEl?.textContent || "0") || 0,
-        }
+    const btn = $(".comment-more-btn", moreLi)
+    if (btn) {
+        btn.innerHTML = `<svg viewBox="0 0 24 24" class="icon-more-replies"><path fill="currentColor" d="M16.59 8.59L12 13.17 7.41 8.59 6 10l6 6 6-6z"/></svg><span>${count}</span>`
     }
+}
 
-    function setReactionState(container: Element, state: { isLiked: boolean; isDisliked: boolean; score: number }) {
-        const likeBtn = container.querySelector(".like-button, .like-button-alt") as HTMLElement | null
-        const dislikeBtn = container.querySelector(".dislike-button, .dislike-button-alt") as HTMLElement | null
-        const scoreEl = container.querySelector(".score-count") as HTMLElement | null
-
-        likeBtn?.classList.toggle("active", state.isLiked)
-        dislikeBtn?.classList.toggle("active", state.isDisliked)
-        if (scoreEl) scoreEl.textContent = state.score.toString()
-    }
-
-    // Lazy load comments
-    const commentsList = document.querySelector(".comments > ul");
-
-    if (commentsSection && commentsList) {
-        const hasServerRenderedComments = !!commentsList.querySelector(".comment-container")
-        const contentId = commentsSection.getAttribute("data-content-id");
-        if (hasServerRenderedComments) {
-            // Always refresh from API to keep first payload trimmed by replies_limit.
-            loadComments(contentId)
-        } else if (!hasServerRenderedComments) {
-            const observer = new IntersectionObserver((entries) => {
-                if (entries[0].isIntersecting) {
-                    observer.disconnect();
-                    loadComments(contentId);
-                }
-            });
-            observer.observe(commentsSection);
-        }
-    }
-
-    async function loadComments(contentId: string | null) {
-        if (!contentId) return;
-
-        // params from URL or defaults
-        // For simplicity, let's grab defaults or query params if any. 
-        // But this is usually for the current page content. 
-        // We can check if there are URL params for sort/page, but typically standard load is enough.
-
-        const headers: HeadersInit = { "Content-Type": "application/json" }
-        const token = getStoredAuthToken()
-        const sort = commentsSection?.getAttribute("data-sort") || "threads_recent"
-        const size = Math.max(1, Math.min(100, toNumber(commentsSection?.getAttribute("data-size"), 50)))
-        const hotSize = Math.max(0, Math.min(5, toNumber(commentsSection?.getAttribute("data-hot-size"), 0)))
-        const hotMinLikes = Math.max(1, toNumber(commentsSection?.getAttribute("data-hot-min-likes"), 1))
-        const initialRepliesLimit = Math.max(1, toNumber(commentsSection?.getAttribute("data-initial-replies-limit"), INITIAL_VISIBLE_REPLIES))
-        const siteId = toNumber(commentsSection?.getAttribute("data-site-id"), 0)
-        if (token) {
-            headers["X-Comment-Token"] = token
-        }
-
-        try {
-            const res = await fetch(
-                `${endpoint}/list?content_id=${contentId}&sort=${encodeURIComponent(sort)}&size=${size}&replies_limit=${initialRepliesLimit}&hot_size=${hotSize}&hot_min_likes=${hotMinLikes}&site_id=${siteId}`,
-                { headers },
-            )
-            const json = await res.json()
-            if (json.success && json.items) {
-                isCurrentUserAdminFlag = Boolean(json.is_admin)
-                commentsList!.innerHTML = ""; // Clear cached comments
-                const mergedItems = [
-                    ...(Array.isArray(json.hot_items) ? json.hot_items : []),
-                    ...(Array.isArray(json.items) ? json.items : []),
-                ]
-                if (mergedItems.length === 0) {
-                    commentsList!.innerHTML = `<li><p>${i18nNoComments}</p></li>`
-                } else {
-                    for (const raw of mergedItems) {
-                        const comment = normalizeComment(raw)
-                        // Skip deleted comments with no descendants
-                        if (comment.Status === "deleted" && comment.ReplyCount <= 0) continue
-                        commentsList!.appendChild(renderComment(comment))
-                    }
-                    collapseInitialReplies()
-                }
-            }
-        } catch (e) {
-            console.error("Failed to load fresh comments", e);
-        }
-    }
-
-    async function loadMoreReplies(parentId: number, parentLi: Element, parentContainer: Element, moreBtn: HTMLElement) {
-        const contentId = toNumber(commentsSection?.getAttribute("data-content-id"), 0)
-        if (!contentId) return
-        const sort = commentsSection?.getAttribute("data-sort") || "threads_recent"
-        const threadDirectSize = Math.max(1, toNumber(commentsSection?.getAttribute("data-thread-direct-size"), LOAD_MORE_BATCH))
-        const threadRepliesLimit = Math.max(1, toNumber(commentsSection?.getAttribute("data-thread-replies-limit"), INITIAL_VISIBLE_REPLIES))
-        const siteId = toNumber(commentsSection?.getAttribute("data-site-id"), 0)
-        const { directReplyTotal } = getParentMeta(parentContainer)
-
-        const directChildren = getDirectChildLis(parentLi, parentContainer)
-        const hiddenDirect = directChildren.filter((li) => (li as HTMLElement).style.display === "none")
-        let cursor = parentContainer.getAttribute("data-next-cursor") || ""
-        let size = threadDirectSize
-        let requestRepliesLimit = Math.max(1, toNumber(parentContainer.getAttribute("data-thread-replies-limit-current"), threadRepliesLimit))
-
-        // If direct replies were previously loaded but descendants were truncated, we might need to increase depth?
-        // But with cursor pagination, if we have a cursor, we use it. 
-        // If we don't have a cursor but directReplyTotal > visible, it means we might be in the 'increased depth' scenario.
-        if (!cursor && directReplyTotal >= 0 && directChildren.length >= directReplyTotal) {
-            cursor = "" // start from scratch with more depth
-            size = Math.max(1, Math.min(50, directReplyTotal))
-            requestRepliesLimit = Math.min(50, requestRepliesLimit + threadRepliesLimit)
-            parentContainer.setAttribute("data-thread-replies-limit-current", requestRepliesLimit.toString())
-        }
-
-        const headers: HeadersInit = { "Content-Type": "application/json" }
-        const token = getStoredAuthToken()
-        if (token) {
-            headers["X-Comment-Token"] = token
-        }
-
-        if ("disabled" in moreBtn) {
-            ; (moreBtn as HTMLButtonElement).disabled = true
-        }
-        const prevText = moreBtn.textContent || ""
-        moreBtn.textContent = i18nLoading
-        try {
-            const json = await requestJsonWithAuthRetry(
-                `${endpoint}/thread?content_id=${contentId}&parent_id=${parentId}&cursor=${encodeURIComponent(cursor)}&size=${size}&sort=${encodeURIComponent(sort)}&replies_limit=${requestRepliesLimit}&site_id=${siteId}`,
-                { method: "GET", headers },
-            )
-
-            const apiTotal = toNumber(json?.total, -1)
-            if (apiTotal >= 0) {
-                // Backend thread total is direct replies total for this parent.
-                parentContainer.setAttribute("data-direct-reply-total", apiTotal.toString())
-            }
-            if (json?.next_cursor !== undefined) {
-                parentContainer.setAttribute("data-next-cursor", json.next_cursor || "")
-            }
-
-            // Always reveal a portion of already-loaded hidden direct replies first.
-            if (hiddenDirect.length > 0) {
-                const revealCount = Math.min(LOAD_MORE_BATCH, hiddenDirect.length)
-                for (let i = 0; i < revealCount; i++) {
-                    setSubtreeVisibility(hiddenDirect[i], true)
-                }
-            }
-
-            if (json?.success && Array.isArray(json.items) && json.items.length > 0) {
-                const known = new Set(
-                    Array.from(document.querySelectorAll(".comment-container[data-comment-id]"))
-                        .map((el) => (el as HTMLElement).getAttribute("data-comment-id"))
-                        .filter(Boolean),
-                )
-                const anchor = findThreadInsertAnchor(parentLi, parentContainer)
-                let lastAnchor: Element = anchor
-                for (const raw of json.items) {
-                    const normalized = normalizeComment(raw, { ParentId: parentId })
-                    if (normalized.CommentId > 0 && known.has(normalized.CommentId.toString())) {
-                        continue
-                    }
-                    // Skip deleted comments with no descendants
-                    if (normalized.Status === "deleted" && normalized.ReplyCount <= 0) {
-                        continue
-                    }
-                    const newEl = renderComment(normalized)
-                    lastAnchor.insertAdjacentElement("afterend", newEl)
-                    lastAnchor = newEl
-                    if (normalized.CommentId > 0) {
-                        known.add(normalized.CommentId.toString())
-                    }
-                }
-            }
-
-            updateMoreRepliesControl(parentLi, parentContainer)
-        } catch (err) {
-            console.error("Failed to load more replies", err)
-            moreBtn.textContent = prevText
-        } finally {
-            if ("disabled" in moreBtn) {
-                ; (moreBtn as HTMLButtonElement).disabled = false
-            }
-            if (moreBtn.textContent === i18nLoading) {
-                updateMoreRepliesControl(parentLi, parentContainer)
-            }
-        }
-    }
-
-    // Like / Dislike
-    document.body.addEventListener("click", async (e) => {
-        const target = getEventTargetElement(e.target)
-        if (!target) return
-        const btn = target.closest(".like-button, .dislike-button, .like-button-alt, .dislike-button-alt")
-        if (!btn) return
-        e.preventDefault()
-
-        const container = getCommentContainer(btn)
-        // If it's a top-level fake button (template example), ignore or handle if it has data-id
+function collapseInitialReplies() {
+    $$(".comments > ul > li").forEach(li => {
+        const container = $(".comment-container", li)
         if (!container) return
-
-        const commentId = container.getAttribute("data-comment-id")
-        if (!commentId) return
-
-        const isLike = btn.classList.contains("like-button") || btn.classList.contains("like-button-alt")
-        const action = isLike ? "like" : "dislike"
-        const prev = getReactionState(container)
-        const next = { ...prev }
-
-        if (isLike) {
-            if (prev.isLiked) {
-                // Repeat click on active like => remove like
-                next.isLiked = false
-                next.score = prev.score - 1
-            } else {
-                // Add like; if dislike was active, remove it
-                next.isLiked = true
-                next.score = prev.score + 1
-                if (prev.isDisliked) {
-                    next.isDisliked = false
-                    next.score = prev.score + 2 // +1 for removing dislike, +1 for adding like
-                }
-            }
-        } else {
-            if (prev.isDisliked) {
-                // Repeat click on active dislike => remove dislike
-                next.isDisliked = false
-                next.score = prev.score + 1
-            } else {
-                // Add dislike; if like was active, remove it
-                next.isDisliked = true
-                next.score = prev.score - 1
-                if (prev.isLiked) {
-                    next.isLiked = false
-                    next.score = prev.score - 2 // -1 for removing like, -1 for adding dislike
-                }
-            }
+        const children = getDirectChildren(li, container)
+        const total = toNum(container.dataset.replyCount)
+        if (children.length <= INITIAL_VISIBLE_REPLIES && total <= INITIAL_VISIBLE_REPLIES) return
+        for (let i = INITIAL_VISIBLE_REPLIES; i < children.length; i++) {
+            setSubtreeVisibility(children[i], false)
         }
-
-        setReactionState(container, next)
-
-        try {
-            const headers: HeadersInit = { "Content-Type": "application/json" }
-            const token = getStoredAuthToken()
-            if (token) {
-                headers["X-Comment-Token"] = token
-            }
-
-            await requestJsonWithAuthRetry(`${endpoint}/${commentId}/${action}`, {
-                method: "POST",
-                headers: headers
-            })
-        } catch (err) {
-            // Revert optimistic update on failure
-            setReactionState(container, prev)
-            console.error(err)
-        }
+        updateMoreRepliesControl(li, container)
     })
+}
 
-    document.body.addEventListener("click", async (e) => {
-        const target = getEventTargetElement(e.target)
-        if (!target) return
-        const btn = target.closest(".comment-more-btn") as HTMLButtonElement | null
-        const fallbackLink = !btn ? target.closest(".comment-more-item a") as HTMLAnchorElement | null : null
-        if (!btn && !fallbackLink) return
-        e.preventDefault()
+function focusNewComment(li: HTMLElement) {
+    const container = $(".comment-container", li)
+    if (!container?.id) return
+    const hash = `#${container.id}`
+    if (window.location.hash !== hash) window.history.replaceState({}, document.title, hash)
+    container.setAttribute("tabindex", "-1")
+    container.scrollIntoView({ behavior: "smooth", block: "center" })
+    try { container.focus({ preventScroll: true }) } catch { container.focus() }
+}
 
-        const moreControl = (btn || fallbackLink) as HTMLElement
-        const parentId = toNumber(
-            moreControl.getAttribute("data-parent-id")
-            || moreControl.closest(".comment-more-item")?.getAttribute("data-parent-id"),
-            0,
+function getReactionState(container: HTMLElement) {
+    const likeBtn = $(".like-button, .like-button-alt", container)
+    const dislikeBtn = $(".dislike-button, .dislike-button-alt", container)
+    const scoreEl = $(".score-count", container)
+    return {
+        likeBtn, dislikeBtn, scoreEl,
+        isLiked: likeBtn?.classList.contains("active") ?? false,
+        isDisliked: dislikeBtn?.classList.contains("active") ?? false,
+        score: toNum(scoreEl?.textContent),
+    }
+}
+
+function setReactionState(container: HTMLElement, state: { isLiked: boolean; isDisliked: boolean; score: number }) {
+    $(".like-button, .like-button-alt", container)?.classList.toggle("active", state.isLiked)
+    $(".dislike-button, .dislike-button-alt", container)?.classList.toggle("active", state.isDisliked)
+    const score = $(".score-count", container)
+    if (score) score.textContent = String(state.score)
+}
+
+async function loadComments(contentId: string | null, from = 0) {
+    if (!contentId) return
+
+    const section = $(".comments")
+    const list = $(".comments > ul")
+    if (!list) return
+
+    const params = {
+        content_id: contentId,
+        sort: section?.dataset.sort || "threads_recent",
+        size: Math.max(1, Math.min(100, toNum(section?.dataset.size, 50))),
+        from,
+        replies_limit: Math.max(1, toNum(section?.dataset.initialRepliesLimit, INITIAL_VISIBLE_REPLIES)),
+        hot_size: from === 0 ? Math.max(0, Math.min(5, toNum(section?.dataset.hotSize, 0))) : 0,
+        hot_min_likes: Math.max(1, toNum(section?.dataset.hotMinLikes, 1)),
+        site_id: toNum(section?.dataset.siteId),
+    }
+
+    if (from === 0) {
+        commentsLoadedFrom = 0
+        commentsTotalCount = 0
+        allCommentsLoaded = false
+    }
+
+    try {
+        const res = await api.get("/list", params)
+        const json = await res.json()
+        if (!json.success || !json.items) return
+
+        isCurrentUserAdminFlag = Boolean(json.is_admin)
+        // Store minion user_id from API for ownership comparison
+        if (json.current_user_id > 0) {
+            currentMinionUserId = toNum(json.current_user_id)
+            console.log("[comments] Got current_user_id from API:", currentMinionUserId)
+        }
+        commentsTotalCount = json.total || 0
+
+        const items = [...(from === 0 && Array.isArray(json.hot_items) ? json.hot_items : []), ...json.items]
+        commentsLoadedFrom += json.items.length
+        if (commentsLoadedFrom >= commentsTotalCount) allCommentsLoaded = true
+
+        if (from === 0) list.innerHTML = ""
+
+        if (items.length === 0 && from === 0) {
+            list.innerHTML = `<li><p>${i18n.noComments}</p></li>`
+        } else {
+            items.forEach((raw: any) => {
+                const c = normalizeComment(raw)
+                if (c.Status === "deleted" && c.ReplyCount <= 0) return
+                list.appendChild(renderComment(c))
+            })
+            collapseInitialReplies()
+        }
+    } catch (e) {
+        console.error("Failed to load comments", e)
+    }
+}
+
+async function loadMoreComments(contentId: string | null) {
+    if (!contentId || isLoadingMoreComments || allCommentsLoaded) return
+    isLoadingMoreComments = true
+    $(".comments-loading")?.classList.remove("hidden")
+
+    try {
+        await loadComments(contentId, commentsLoadedFrom)
+    } finally {
+        isLoadingMoreComments = false
+        $(".comments-loading")?.classList.add("hidden")
+    }
+}
+
+async function loadMoreReplies(parentId: number, parentLi: HTMLElement, parentContainer: HTMLElement, moreBtn: HTMLElement) {
+    const section = $(".comments")
+    const contentId = toNum(section?.dataset.contentId)
+    if (!contentId) return
+
+    const { directReplyTotal } = getParentMeta(parentContainer)
+    const directChildren = getDirectChildren(parentLi, parentContainer)
+    const hiddenDirect = directChildren.filter(li => li.style.display === "none")
+
+    let cursor = parentContainer.dataset.nextCursor || ""
+    let size = Math.max(1, toNum(section?.dataset.threadDirectSize, LOAD_MORE_BATCH))
+    let repliesLimit = Math.max(1, toNum(parentContainer.dataset.threadRepliesLimitCurrent, toNum(section?.dataset.threadRepliesLimit, INITIAL_VISIBLE_REPLIES)))
+
+    if (!cursor && directReplyTotal >= 0 && directChildren.length >= directReplyTotal) {
+        cursor = ""
+        size = Math.max(1, Math.min(50, directReplyTotal))
+        repliesLimit = Math.min(50, repliesLimit + toNum(section?.dataset.threadRepliesLimit, INITIAL_VISIBLE_REPLIES))
+        parentContainer.dataset.threadRepliesLimitCurrent = String(repliesLimit)
+    }
+
+    if ((moreBtn as HTMLButtonElement).disabled !== undefined) (moreBtn as HTMLButtonElement).disabled = true
+    const prevText = moreBtn.textContent || ""
+    moreBtn.textContent = i18n.loading
+
+    try {
+        const json = await requestWithAuthRetry(
+            `${endpoint}/thread?content_id=${contentId}&parent_id=${parentId}&cursor=${encodeURIComponent(cursor)}&size=${size}&sort=${encodeURIComponent(section?.dataset.sort || "threads_recent")}&replies_limit=${repliesLimit}&site_id=${toNum(section?.dataset.siteId)}`,
+            { method: "GET", headers: api.headers() }
         )
-        if (!parentId) return
-        const parentContainer = document.querySelector(`.comment-container[data-comment-id="${parentId}"]`) as HTMLElement | null
-        if (!parentContainer) return
-        const parentLi = parentContainer.closest("li")
-        if (!parentLi) return
 
-        await loadMoreReplies(parentId, parentLi, parentContainer, (btn || fallbackLink) as HTMLElement)
-    })
+        if (json.total >= 0) parentContainer.dataset.directReplyTotal = String(json.total)
+        if (json.next_cursor !== undefined) parentContainer.dataset.nextCursor = json.next_cursor || ""
 
-    // Reply Button
-    document.body.addEventListener("click", (e) => {
-        const target = getEventTargetElement(e.target)
-        if (!target) return
-        if (!target.matches(".reply-button")) return
+        if (hiddenDirect.length > 0) {
+            const reveal = Math.min(LOAD_MORE_BATCH, hiddenDirect.length)
+            for (let i = 0; i < reveal; i++) setSubtreeVisibility(hiddenDirect[i], true)
+        }
 
-        const container = getCommentContainer(target)
-        if (!container) return
+        if (json.success && Array.isArray(json.items) && json.items.length > 0) {
+            const known = new Set($$(".comment-container[data-comment-id]").map(el => el.dataset.commentId).filter(Boolean))
+            const anchor = findThreadAnchor(parentLi, parentContainer)
+            let lastAnchor: HTMLElement = anchor
 
-        const replyBox = container.querySelector(".comment-reply")
-        if (replyBox) {
-            replyBox.classList.toggle("active")
-            if (replyBox.classList.contains("active")) {
-                const input = replyBox.querySelector("textarea") as HTMLTextAreaElement
-                if (input) input.focus()
-            }
+            json.items.forEach((raw: any) => {
+                const c = normalizeComment(raw, { ParentId: parentId })
+                if (c.CommentId > 0 && known.has(String(c.CommentId))) return
+                if (c.Status === "deleted" && c.ReplyCount <= 0) return
+                const el = renderComment(c)
+                lastAnchor.insertAdjacentElement("afterend", el)
+                lastAnchor = el
+                if (c.CommentId > 0) known.add(String(c.CommentId))
+            })
+        }
+
+        updateMoreRepliesControl(parentLi, parentContainer)
+    } catch (err) {
+        console.error("Failed to load more replies", err)
+        moreBtn.textContent = prevText
+    } finally {
+        if ((moreBtn as HTMLButtonElement).disabled !== undefined) (moreBtn as HTMLButtonElement).disabled = false
+        if (moreBtn.textContent === i18n.loading) updateMoreRepliesControl(parentLi, parentContainer)
+    }
+}
+
+// Hide like/dislike buttons for own comments on SSR-rendered content
+function hideOwnCommentReactions() {
+    const currentUserId = getCurrentUserId()
+    if (currentUserId <= 0) return
+    $$(".comment-container[data-user-id]").forEach(container => {
+        const commentUserId = toNum(container.dataset.userId)
+        if (commentUserId > 0 && commentUserId === currentUserId) {
+            $(".like-button", container)?.classList.add("hidden")
+            $(".dislike-button", container)?.classList.add("hidden")
         }
     })
+}
 
-    // Delete Button
+// Event handlers
+document.addEventListener("DOMContentLoaded", () => {
+    const section = $(".comments")
+    const list = $(".comments > ul")
+    const sentinel = $(".comments-sentinel")
+    if (!section || !list) return
+
+    const contentId = attr(section, "data-content-id")
+    const hasServerComments = !!$(".comment-container", list)
+    const ssrCommentPage = toNum(section.dataset.commentPage, 1)
+    const ssrCommentsTotal = toNum(section.dataset.commentsTotal, 0)
+    const pageSize = Math.max(1, Math.min(100, toNum(section.dataset.size, 50)))
+
+    // Hide reactions for own comments on page load
+    hideOwnCommentReactions()
+
+    if (hasServerComments && ssrCommentPage > 1) {
+        // Page 2+: keep SSR content, just initialize infinite scroll state
+        commentsLoadedFrom = (ssrCommentPage - 1) * pageSize + (list.querySelectorAll(":scope > li").length)
+        commentsTotalCount = ssrCommentsTotal
+        if (commentsLoadedFrom >= commentsTotalCount) allCommentsLoaded = true
+    } else if (hasServerComments) {
+        loadComments(contentId)
+    } else {
+        const observer = new IntersectionObserver(entries => {
+            if (entries[0].isIntersecting) {
+                observer.disconnect()
+                loadComments(contentId)
+            }
+        })
+        observer.observe(section)
+    }
+
+    if (sentinel) {
+        const scrollRoot = $(".comments-wrapper")
+        const infiniteObserver = new IntersectionObserver(entries => {
+            if (entries[0].isIntersecting && !isLoadingMoreComments && !allCommentsLoaded) {
+                loadMoreComments(contentId)
+            }
+        }, { root: scrollRoot, rootMargin: "200px" })
+        infiniteObserver.observe(sentinel)
+    }
+
+    // Click handlers
     document.body.addEventListener("click", async (e) => {
-        const target = getEventTargetElement(e.target)
-        if (!target) return
-        if (!target.closest(".delete-button")) return
-        e.preventDefault()
+        const target = e.target as HTMLElement
 
-        const btn = target.closest(".delete-button") as HTMLButtonElement
-        const container = getCommentContainer(btn)
-        if (!container) return
+        // Like/Dislike
+        const reactionBtn = target.closest(".like-button, .dislike-button, .like-button-alt, .dislike-button-alt") as HTMLElement
+        if (reactionBtn) {
+            e.preventDefault()
+            const container = reactionBtn.closest(".comment-container") as HTMLElement
+            if (!container) return
+            const commentId = container.dataset.commentId
+            if (!commentId) return
 
-        const commentId = container.getAttribute("data-comment-id")
-        if (!commentId || commentId === "0") return
-
-        if (!confirm(i18nDeleteConfirm)) return
-
-        btn.disabled = true
-        try {
-            const headers: HeadersInit = { "Content-Type": "application/json" }
-            const token = getStoredAuthToken()
-            if (token) {
-                headers["X-Comment-Token"] = token
+            // Prevent liking/disliking own comments
+            const commentUserId = toNum(container.dataset.userId)
+            const currentUserId = getCurrentUserId()
+            console.log("[comments] like/dislike check:", { commentUserId, currentUserId, match: commentUserId === currentUserId })
+            if (commentUserId > 0 && currentUserId > 0 && commentUserId === currentUserId) {
+                console.log("[comments] blocked self-like")
+                return
             }
 
-            await requestJsonWithAuthRetry(`${endpoint}/delete?comment_id=${commentId}`, {
-                method: "POST",
-                headers: headers,
-            })
+            const isLike = reactionBtn.classList.contains("like-button") || reactionBtn.classList.contains("like-button-alt")
+            const prev = getReactionState(container)
+            const next = { ...prev }
 
-            // Successfully deleted - update the UI
-            const replyCount = toNumber(container.getAttribute("data-reply-count"), 0)
-            if (replyCount > 0) {
-                // Comment has children - show as deleted placeholder
-                container.classList.add("comment-deleted")
-                container.setAttribute("data-status", "deleted")
-                const textEl = container.querySelector(".comment-text")
-                if (textEl) textEl.textContent = i18nCommentDeleted
-                const usernameEl = container.querySelector(".comment-username")
-                if (usernameEl) usernameEl.textContent = ""
-                const contextEl = container.querySelector(".comment-context")
-                if (contextEl) {
-                    contextEl.textContent = ""
-                    contextEl.classList.add("hidden")
-                }
-                const actionsEl = container.querySelector(".comment-actions")
-                if (actionsEl) (actionsEl as HTMLElement).classList.add("hidden")
-                const replyBoxEl = container.querySelector(".comment-reply")
-                if (replyBoxEl) (replyBoxEl as HTMLElement).classList.add("hidden")
-                // Reset avatar to placeholder
-                const avatarImg = container.querySelector(".avatar img") as HTMLImageElement
-                if (avatarImg) avatarImg.src = "/images/avatar_placeholder.png"
+            if (isLike) {
+                if (prev.isLiked) { next.isLiked = false; next.score = prev.score - 1 }
+                else { next.isLiked = true; next.score = prev.score + 1; if (prev.isDisliked) { next.isDisliked = false; next.score += 1 } }
             } else {
-                // No children - remove the comment element entirely
-                const li = container.closest("li")
-                if (li) {
-                    // Update parent's reply count if this was a reply
-                    const parentId = toNumber(container.getAttribute("data-parent-id"), 0)
-                    if (parentId > 0) {
-                        const parentContainer = document.querySelector(`.comment-container[data-comment-id="${parentId}"]`) as HTMLElement | null
-                        if (parentContainer) {
-                            const parentReplyCount = toNumber(parentContainer.getAttribute("data-reply-count"), 0)
-                            if (parentReplyCount > 0) {
-                                parentContainer.setAttribute("data-reply-count", (parentReplyCount - 1).toString())
-                            }
-                            const parentLi = parentContainer.closest("li")
-                            if (parentLi) {
-                                updateMoreRepliesControl(parentLi, parentContainer)
+                if (prev.isDisliked) { next.isDisliked = false; next.score = prev.score + 1 }
+                else { next.isDisliked = true; next.score = prev.score - 1; if (prev.isLiked) { next.isLiked = false; next.score -= 1 } }
+            }
+
+            setReactionState(container, next)
+            try {
+                await requestWithAuthRetry(`${endpoint}/${commentId}/${isLike ? "like" : "dislike"}`, { method: "POST", headers: api.headers() })
+            } catch (err) {
+                setReactionState(container, prev)
+                console.error(err)
+            }
+            return
+        }
+
+        // Load more replies
+        const moreBtn = target.closest(".comment-more-btn") as HTMLButtonElement
+        const fallbackLink = !moreBtn ? target.closest(".comment-more-item a") as HTMLAnchorElement : null
+        if (moreBtn || fallbackLink) {
+            e.preventDefault()
+            const control = (moreBtn || fallbackLink)!
+            const moreItem = control.closest(".comment-more-item") as HTMLElement | null
+            const parentId = toNum(control.dataset.parentId || moreItem?.dataset.parentId)
+            if (!parentId) return
+            const parentContainer = $(`.comment-container[data-comment-id="${parentId}"]`)
+            if (!parentContainer) return
+            const parentLi = parentContainer.closest("li")
+            if (!parentLi) return
+            await loadMoreReplies(parentId, parentLi as HTMLElement, parentContainer, control)
+            return
+        }
+
+        // Reply toggle
+        if (target.closest(".reply-button")) {
+            const btn = target.closest(".reply-button")!
+            const container = btn.closest(".comment-container") as HTMLElement
+            if (!container) return
+            const replyBox = $(".comment-reply", container)
+            if (replyBox) {
+                replyBox.classList.toggle("active")
+                if (replyBox.classList.contains("active")) {
+                    const input = $("textarea", replyBox) as HTMLTextAreaElement
+                    if (input) input.focus()
+                }
+            }
+            return
+        }
+
+        // Delete
+        if (target.closest(".delete-button")) {
+            e.preventDefault()
+            const btn = target.closest(".delete-button") as HTMLButtonElement
+            const container = btn.closest(".comment-container") as HTMLElement
+            if (!container) return
+            const commentId = container.dataset.commentId
+            if (!commentId || commentId === "0") return
+            if (!confirm(i18n.deleteConfirm)) return
+
+            btn.disabled = true
+            try {
+                await requestWithAuthRetry(`${endpoint}/delete?comment_id=${commentId}`, { method: "POST", headers: api.headers() })
+
+                const replyCount = toNum(container.dataset.replyCount)
+                if (replyCount > 0) {
+                    container.classList.add("comment-deleted")
+                    container.dataset.status = "deleted"
+                    const text = $(".comment-text", container)
+                    if (text) text.textContent = i18n.deleted
+                    $(".comment-username", container)!.textContent = ""
+                    const context = $(".comment-context", container)
+                    if (context) { context.textContent = ""; context.classList.add("hidden") }
+                    $(".comment-actions", container)?.classList.add("hidden")
+                    $(".comment-reply", container)?.classList.add("hidden")
+                    const avatar = $(".avatar img", container) as HTMLImageElement
+                    if (avatar) avatar.src = "/images/avatar_placeholder.png"
+                } else {
+                    const li = container.closest("li")
+                    if (li) {
+                        const parentId = toNum(container.dataset.parentId)
+                        if (parentId > 0) {
+                            const parentContainer = $(`.comment-container[data-comment-id="${parentId}"]`)
+                            if (parentContainer) {
+                                const count = toNum(parentContainer.dataset.replyCount)
+                                if (count > 0) parentContainer.dataset.replyCount = String(count - 1)
+                                const parentLi = parentContainer.closest("li")
+                                if (parentLi) updateMoreRepliesControl(parentLi as HTMLElement, parentContainer)
                             }
                         }
+                        li.remove()
                     }
-                    li.remove()
                 }
+            } catch (err) {
+                console.error("Failed to delete comment", err)
+                alert(String(err instanceof Error ? err.message : "Error deleting comment"))
+            } finally {
+                btn.disabled = false
             }
-        } catch (err) {
-            console.error("Failed to delete comment", err)
-            alert(String(err instanceof Error ? err.message : "Error deleting comment"))
-        } finally {
-            btn.disabled = false
-        }
-    })
-
-    // Send Comment (Top level or Reply)
-    document.body.addEventListener("click", async (e) => {
-        const target = getEventTargetElement(e.target)
-        if (!target) return
-        if (!target.matches(".send-comment-button, .submit-btn")) return
-        e.preventDefault()
-
-        const isReply = target.classList.contains("send-comment-button")
-
-        let input: HTMLTextAreaElement | null = null
-        let contentId = 0
-        let replyToId = 0
-
-        if (isReply) {
-            const container = getCommentContainer(target)
-            if (!container) return
-            input = container.querySelector(".comment-reply textarea")
-            replyToId = parseInt(container.getAttribute("data-comment-id") || "0")
-            // Find content id from global context or a data attribute on the comments section
-            const commentsSection = document.querySelector(".comments")
-            if (commentsSection) {
-                contentId = parseInt(commentsSection.getAttribute("data-content-id") || "0")
-            }
-        } else {
-            // Main form
-            const form = target.closest(".comment-form")
-            if (!form) return
-            input = form.querySelector("textarea")
-            const commentsSection = document.querySelector(".comments")
-            if (commentsSection) {
-                contentId = parseInt(commentsSection.getAttribute("data-content-id") || "0")
-            }
-        }
-
-        if (!input || !input.value.trim()) return
-        if (!contentId) {
-            console.error("No content ID found")
             return
         }
 
-        const text = input.value.trim()
-        target.setAttribute("disabled", "true")
+        // Send comment
+        const sendBtn = target.closest(".send-comment-button, .submit-btn")
+        if (sendBtn) {
+            e.preventDefault()
+            const isReply = sendBtn.classList.contains("send-comment-button")
 
-        try {
-            const payload = {
-                content_id: contentId,
-                text: text,
-                reply_to_comment_id: replyToId,
-                // captcha?
+            let input: HTMLTextAreaElement | null = null
+            let contentId = 0
+            let replyToId = 0
+
+            if (isReply) {
+                const container = sendBtn.closest(".comment-container") as HTMLElement
+                if (!container) return
+                input = $(".comment-reply textarea", container) as HTMLTextAreaElement
+                replyToId = toNum(container.dataset.commentId)
+                contentId = toNum($(".comments")?.dataset.contentId)
+            } else {
+                const form = sendBtn.closest(".comment-form")
+                if (!form) return
+                input = $("textarea", form) as HTMLTextAreaElement
+                contentId = toNum($(".comments")?.dataset.contentId)
             }
 
-            const headers: HeadersInit = { "Content-Type": "application/json" }
-            const token = getStoredAuthToken()
-            if (token) {
-                headers["X-Comment-Token"] = token
-            }
+            if (!input?.value.trim() || !contentId) return
 
-            const json = await requestJsonWithAuthRetry(`${endpoint}/add`, {
-                method: "POST",
-                headers: headers,
-                body: JSON.stringify(payload)
-            })
-            console.log("Comment Add Response:", json)
-            if (json.success) {
-                input.value = ""
-                if (json.comment) {
-                    const normalized = normalizeComment(json.comment, {
-                        ParentId: replyToId,
-                    })
-                    const newCommentEl = renderComment(normalized)
+            const text = input.value.trim()
+            sendBtn.setAttribute("disabled", "true")
+
+            try {
+                const json = await requestWithAuthRetry(`${endpoint}/add`, {
+                    method: "POST",
+                    headers: api.headers(),
+                    body: JSON.stringify({ content_id: contentId, text, reply_to_comment_id: replyToId }),
+                })
+
+                if (json.success && json.comment) {
+                    input.value = ""
+                    const c = normalizeComment(json.comment, { ParentId: replyToId })
+                    const el = renderComment(c)
+
                     if (replyToId > 0) {
-                        // This was a reply
-                        // Insert at the end of parent's subtree, not directly after parent.
-                        const parentContainer = document.querySelector(`.comment-container[data-comment-id="${replyToId}"]`)
+                        const parentContainer = $(`.comment-container[data-comment-id="${replyToId}"]`)
                         if (parentContainer) {
-                            const parentLi = parentContainer.closest("li")
+                            const parentLi = parentContainer.closest("li") as HTMLElement
                             if (parentLi) {
-                                const anchor = findThreadInsertAnchor(parentLi, parentContainer)
-                                anchor.insertAdjacentElement("afterend", newCommentEl)
-                                const currentReplyCount = toNumber(parentContainer.getAttribute("data-reply-count"), 0)
-                                parentContainer.setAttribute("data-reply-count", (currentReplyCount + 1).toString())
+                                const anchor = findThreadAnchor(parentLi, parentContainer)
+                                anchor.insertAdjacentElement("afterend", el)
+                                const count = toNum(parentContainer.dataset.replyCount)
+                                parentContainer.dataset.replyCount = String(count + 1)
                                 updateMoreRepliesControl(parentLi, parentContainer)
-                                focusNewComment(newCommentEl)
-                                // Close reply box
-                                const replyBox = parentContainer.querySelector(".comment-reply")
-                                if (replyBox) replyBox.classList.remove("active")
-                            } else {
-                                console.error("Parent LI not found for comment", replyToId)
+                                focusNewComment(el)
+                                $(".comment-reply", parentContainer)?.classList.remove("active")
                             }
-                        } else {
-                            console.error("Parent container not found for comment", replyToId)
                         }
                     } else {
-                        // Top level
-                        const commentsList = document.querySelector(".comments > ul")
-                        if (commentsList) {
-                            // Remove "No comments" placeholder if it exists
-                            const firstLi = commentsList.querySelector("li")
-                            if (firstLi && firstLi.textContent && firstLi.textContent.trim().length < 50 && !firstLi.querySelector(".comment-container")) {
-                                firstLi.remove()
-                            }
-                            commentsList.insertAdjacentElement("afterbegin", newCommentEl)
-                            focusNewComment(newCommentEl)
-                        } else {
-                            console.error("Comments list not found")
+                        const list = $(".comments > ul")
+                        if (list) {
+                            const firstLi = $("li", list)
+                            if (firstLi && !$(".comment-container", firstLi)) firstLi.remove()
+                            list.insertAdjacentElement("afterbegin", el)
+                            focusNewComment(el)
                         }
                     }
                 } else {
-                    console.error("No comment returned from server")
+                    alert("Error: " + json.error)
                 }
-            } else {
-                alert("Error: " + json.error)
+            } catch (err) {
+                console.error(err)
+                if (!(err instanceof Error && err.message === "Login required")) {
+                    alert("Error sending comment")
+                }
+            } finally {
+                sendBtn.removeAttribute("disabled")
             }
-
-        } catch (err) {
-            console.error(err)
-            if (!(err instanceof Error && err.message === "Login required")) {
-                alert("Error sending comment")
-            }
-        } finally {
-            target.removeAttribute("disabled")
         }
     })
 })

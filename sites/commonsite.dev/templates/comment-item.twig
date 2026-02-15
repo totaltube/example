@@ -29,28 +29,41 @@
             {% endif %}
         </div>
         <div class="comment-content">
-            <span class="comment-username">{% if is_deleted %}{{ translate("Deleted") }}{% else %}{{ comment.Username }}{% endif %}</span>
-            <div class="comment-context{% if comment.ParentId <= 0 %} hidden{% endif %}">
-                {% if comment.ParentId > 0 and not is_deleted %}
-                    {% if reply_to_name %}
-                        {{ translate("Replying to") }}
-                        <a class="comment-parent-link" href="#comment-{{ comment.ParentId }}">@{{ reply_to_name }}</a>
-                    {% else %}
-                        {{ translate("Replying to") }}
-                        <a class="comment-parent-link" href="#comment-{{ comment.ParentId }}">#{{ comment.ParentId }}</a>
-                    {% endif %}
+            <div class="comment-header">
+                <div class="comment-info">
+                    <span class="comment-username">{% if is_deleted %}{{ translate("Deleted") }}{% else %}{{ comment.Username }}{% endif %}</span>
+                    <span class="comment-date">{{ comment.Created.Format("01/02/2006 at 03:04 PM") }}</span>
+                    <div class="comment-context{% if comment.ParentId <= 0 %} hidden{% endif %}">
+                        {% if comment.ParentId > 0 and not is_deleted %}
+                            {% if reply_to_name %}
+                                <a class="comment-parent-link" href="#comment-{{ comment.ParentId }}" title="{{ translate("Replying to") }} {{ reply_to_name }}">
+                                    <span class="c-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 16l-4-4 4-4"/><path d="M20 21v-7a4 4 0 0 0-4-4H6"/></svg></span>
+                                </a>
+                            {% else %}
+                                <a class="comment-parent-link" href="#comment-{{ comment.ParentId }}" title="{{ translate("Replying to") }} #{{ comment.ParentId }}">
+                                    <span class="c-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 16l-4-4 4-4"/><path d="M20 21v-7a4 4 0 0 0-4-4H6"/></svg></span>
+                                </a>
+                            {% endif %}
+                        {% endif %}
+                    </div>
+                </div>
+                {% if not is_deleted %}
+                <div class="comment-header-actions">
+                    <button class="like-button {% if comment.IsLiked %}active{% endif %}" aria-label="{{ translate("Like") }}">
+                        <span class="c-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg></span>
+                    </button>
+                    <span class="score-count">{{ comment.Likes - comment.Dislikes }}</span>
+                    <button class="dislike-button {% if comment.IsDisliked %}active{% endif %}" aria-label="{{ translate("Dislike") }}">
+                        <span class="c-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/></svg></span>
+                    </button>
+                </div>
                 {% endif %}
             </div>
+
             <div class="comment-text">{% if is_deleted %}{{ translate("Comment deleted") }}{% else %}{{ comment.Text }}{% endif %}</div>
+
             {% if not is_deleted %}
             <div class="comment-actions">
-                <button class="like-button {% if comment.IsLiked %}active{% endif %}" aria-label="{{ translate("Like") }}">
-                    <span class="c-icon"></span>
-                </button>
-                <span class="score-count">{{ comment.Likes - comment.Dislikes }}</span>
-                <button class="dislike-button {% if comment.IsDisliked %}active{% endif %}" aria-label="{{ translate("Dislike") }}">
-                    <span class="c-icon"></span>
-                </button>
                 {% set current_site_id = config.SiteId %}
                 {% set is_cross_site = current_site_id > 0 and comment.SiteId > 0 and comment.SiteId != current_site_id %}
                 <button class="reply-button {% if comment.Indent >= 10 or is_cross_site %}hidden{% endif %}">{{ translate("Reply") }}</button>
