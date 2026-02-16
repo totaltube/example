@@ -31,13 +31,15 @@
         itemscope
         itemtype="https://schema.org/Comment"
     >
+        {% if not is_deleted %}
         <div class="avatar">
-            {% if not is_deleted and comment.Avatar %}
+            {% if comment.Avatar %}
                 <img src="{{ comment.Avatar }}" alt="{{ comment.Username }}">
             {% else %}
                 <img src="/images/avatar_placeholder.png" alt="User Avatar">
             {% endif %}
         </div>
+        {% endif %}
         <div class="comment-content">
             <div class="comment-header">
                 <div class="comment-info">
@@ -73,6 +75,15 @@
                     <button class="dislike-button {% if comment.IsDisliked %}active{% endif %}" aria-label="{{ translate("Dislike") }}">
                         <span class="c-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/></svg></span>
                     </button>
+                    <div class="comment-menu-container hidden">
+                        <button class="comment-menu-btn" aria-label="{{ translate("Menu") }}">
+                            <span class="c-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="12" x2="20" y2="12"></line><line x1="4" y1="6" x2="20" y2="6"></line><line x1="4" y1="18" x2="20" y2="18"></line></svg></span>
+                        </button>
+                        <div class="comment-menu-dropdown hidden">
+                            <a class="comment-permalink dropdown-item" href="#comment-{{ comment.CommentId }}" aria-label="{{ translate("Permalink") }}">{{ translate("Link") }}</a>
+                            <button class="delete-button dropdown-item hidden">{{ translate("Delete") }}</button>
+                        </div>
+                    </div>
                 </div>
                 {% endif %}
             </div>
@@ -86,16 +97,12 @@
                 {% set current_site_id = config.SiteId %}
                 {% set is_cross_site = current_site_id > 0 and comment.SiteId > 0 and comment.SiteId != current_site_id %}
                 <button class="reply-button {% if comment.Indent >= 10 or is_cross_site %}hidden{% endif %}">{{ translate("Reply") }}</button>
-                <button class="delete-button hidden">{{ translate("Delete") }}</button>
             </div>
             <div class="comment-reply {% if comment.Indent >= 10 or is_cross_site %}hidden{% endif %}">
                 <textarea class="comment-input" placeholder="{{ translate("Write a reply...") }}"></textarea>
                 <button class="send-comment-button">{{ translate("Reply") }}</button>
             </div>
         </div>
-        {% if not is_deleted %}
-        <a class="comment-permalink" href="#comment-{{ comment.CommentId }}" aria-label="Comment link">#</a>
-        {% endif %}
         {% endif %}
     </div>
 </li>

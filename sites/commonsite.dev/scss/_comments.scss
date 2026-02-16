@@ -1,5 +1,6 @@
 @import "variables";
 
+// Theme-specific color variables for the comments section
 $comments-primary: $selected-color;
 $comments-surface: lighten($background-color, 20%);
 $comments-text: $text-color;
@@ -17,11 +18,12 @@ $comments-score-positive: mix($selected-color, #2ecc71, 35%);
 $comments-score-negative: mix($selected-color, #e74c3c, 35%);
 $comments-score-neutral: mix($text-color, $background-color, 62%);
 
+// Main container for the entire comments section
 .comments-wrapper {
   max-width: 860px;
   margin: 40px auto;
   width: 100%;
-  max-height: 2400px;
+  //max-height: 2400px;
   overflow-y: auto;
   padding: 0 10px;
   box-sizing: border-box;
@@ -44,30 +46,7 @@ $comments-score-neutral: mix($text-color, $background-color, 62%);
   }
 }
 
-.comments-pagination {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  padding: 12px 0;
-  margin-top: 8px;
-  font-size: 0.9rem;
-
-  a {
-    color: $comments-primary;
-    text-decoration: none;
-    font-weight: 600;
-
-    &:hover {
-      text-decoration: underline;
-    }
-  }
-
-  .comments-page-info {
-    color: $comments-muted;
-  }
-}
-
+// Basic list resets and CSS variables for indentation
 .comments {
   --comment-indent-step: 18px;
   --comment-indent-max: 5;
@@ -88,6 +67,7 @@ $comments-score-neutral: mix($text-color, $background-color, 62%);
   margin-bottom: 10px;
 }
 
+// Progressive enhancement: hide list while JS is initializing to prevent layout shift
 .comments-list-hidden-until-js {
   visibility: hidden;
 }
@@ -97,6 +77,7 @@ $comments-score-neutral: mix($text-color, $background-color, 62%);
 }
 
 
+// "Load more" button styles
 .comment-more-item {
   margin-bottom: 8px;
 }
@@ -131,12 +112,12 @@ $comments-score-neutral: mix($text-color, $background-color, 62%);
   }
 }
 
+// Individual comment card
 .comment-container {
   display: flex;
   gap: 12px;
   align-items: flex-start;
   padding: 14px;
-  border: 1px solid $comments-border;
   // Modern commercial gradient: Slightly lighter top-left, darker bottom-right, with a tiny hint of primary
   // This simulates a soft light source (top-left)
   background: linear-gradient(145deg,
@@ -159,9 +140,6 @@ $comments-score-neutral: mix($text-color, $background-color, 62%);
     border-color: rgba($comments-primary, 0.25);
     box-shadow: 0 8px 25px rgba(33, 47, 70, 0.08), 0 2px 6px rgba(0, 0, 0, 0.03);
     transform: translateY(-1px); // Subtle lift
-
-    // Add a subtle sheen on hover via adjusting gradient? Or just stick to shadow/border.
-    // background: linear-gradient(145deg, $white 0%, mix($comments-primary, $comments-surface-soft, 4%) 100%);
   }
 
   &:target {
@@ -173,6 +151,7 @@ $comments-score-neutral: mix($text-color, $background-color, 62%);
     position: relative;
   }
 
+  // Visual connection line for nested replies (threads)
   &.is-reply::before {
     content: "";
     position: absolute;
@@ -191,6 +170,7 @@ $comments-score-neutral: mix($text-color, $background-color, 62%);
     pointer-events: none;
   }
 
+  // Comment author's avatar
   .avatar {
     width: $avatar-size;
     height: $avatar-size;
@@ -206,6 +186,7 @@ $comments-score-neutral: mix($text-color, $background-color, 62%);
     }
   }
 
+  // Main content area of the comment (header + text + actions)
   .comment-content {
     flex: 1;
     min-width: 0;
@@ -215,6 +196,7 @@ $comments-score-neutral: mix($text-color, $background-color, 62%);
   }
 
   // Header: Name, Date, Context | Actions
+  // Header containing username, date, and context info
   .comment-header {
     display: flex;
     justify-content: space-between;
@@ -271,6 +253,7 @@ $comments-score-neutral: mix($text-color, $background-color, 62%);
     }
   }
 
+  // Action buttons in the header (Voting/Score)
   .comment-header-actions {
     display: flex;
     align-items: center;
@@ -319,20 +302,18 @@ $comments-score-neutral: mix($text-color, $background-color, 62%);
       &.is-disabled,
       &:disabled {
         opacity: 0.5 !important;
-        cursor: not-allowed;
+        cursor: not-allowed !important;
         color: mix($comments-muted, $background-color, 58%) !important;
         filter: grayscale(0.45);
         pointer-events: none;
-      }
 
-      &.is-disabled .c-icon,
-      &:disabled .c-icon {
-        opacity: 0.62;
-      }
+        .c-icon {
+          opacity: 0.62;
+        }
 
-      &.is-disabled:hover,
-      &:disabled:hover {
-        color: mix($comments-muted, $background-color, 58%) !important;
+        &:hover {
+          color: mix($comments-muted, $background-color, 58%) !important;
+        }
       }
 
       .c-icon {
@@ -352,8 +333,96 @@ $comments-score-neutral: mix($text-color, $background-color, 62%);
         opacity: 0.62;
       }
     }
+  }
 
-    // Hide dislike button or style it smaller if needed
+  // Context menu (three dots) and dropdown items
+  .comment-menu-container {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+
+    .comment-menu-btn {
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      padding: 4px;
+      color: $comments-muted;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background-color 0.2s, color 0.2s;
+      line-height: 1;
+
+      &:hover {
+        background-color: rgba($comments-primary, 0.1);
+        color: $comments-primary;
+      }
+
+      .c-icon {
+        width: 18px;
+        height: 18px;
+        color: inherit;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: transparent !important;
+        mask-image: none !important;
+        -webkit-mask-image: none !important;
+
+        svg {
+          width: 100%;
+          height: 100%;
+          stroke: currentColor;
+          display: block;
+        }
+      }
+    }
+
+    .comment-menu-dropdown {
+      position: absolute;
+      top: 100%;
+      right: 0;
+      margin-top: 4px;
+      background: $comments-surface-strong;
+      border: 1px solid $comments-border;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      z-index: 1000;
+      min-width: 120px;
+      padding: 4px 0;
+      overflow: hidden;
+
+      &.hidden {
+        display: none;
+      }
+
+      .dropdown-item {
+        width: 100%;
+        text-align: left;
+        background: transparent;
+        border: none;
+        padding: 8px 16px;
+        font-size: 0.85rem;
+        cursor: pointer;
+        color: $comments-text;
+        transition: background-color 0.2s;
+        display: block;
+
+        &:hover {
+          background-color: rgba($comments-primary, 0.1);
+        }
+
+        &.delete-button {
+          color: #e74c3c;
+          font-weight: 600;
+
+          &.hidden {
+            display: none;
+          }
+        }
+      }
+    }
   }
 
   .comment-text {
@@ -364,6 +433,7 @@ $comments-score-neutral: mix($text-color, $background-color, 62%);
     word-break: break-word;
   }
 
+  // Footer actions: Reply and Delete buttons
   .comment-actions {
     display: flex;
     align-items: center;
@@ -401,6 +471,7 @@ $comments-score-neutral: mix($text-color, $background-color, 62%);
     }
   }
 
+  // Reply form that appears under a comment
   .comment-reply {
     display: none;
     margin-top: 10px;
@@ -413,24 +484,8 @@ $comments-score-neutral: mix($text-color, $background-color, 62%);
     }
 
     textarea.comment-input {
-      width: 100%;
-      max-width: 100%;
-      box-sizing: border-box;
       min-height: 66px;
-      padding: 10px 12px;
-      border: 1px solid $comments-input-border;
-      border-radius: 10px;
-      resize: vertical;
-      font-size: 14px;
-      color: $comments-text;
-      background-color: $comments-surface-strong;
       margin-bottom: 8px;
-
-      &:focus {
-        border-color: $comments-primary;
-        outline: none;
-        box-shadow: 0 0 0 3px rgba($comments-primary, 0.16);
-      }
     }
 
     .send-comment-button {
@@ -449,26 +504,66 @@ $comments-score-neutral: mix($text-color, $background-color, 62%);
     }
   }
 
-  .comment-permalink {
+  // Dialog for copying individual comment link
+  .copy-link-dialog {
     position: absolute;
+    top: 40px;
     right: 14px;
-    bottom: 14px;
-    color: $comments-muted !important;
-    text-decoration: none;
-    font-weight: 600;
-    font-size: 0.85rem;
-    opacity: 0.6;
-    transition: opacity 0.2s, color 0.2s;
-    z-index: 10;
+    background: $comments-surface-strong;
+    border: 1px solid $comments-border;
+    border-radius: 10px;
+    padding: 10px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+    z-index: 1001;
+    animation: fadeIn 0.2s ease;
+    width: 280px;
 
-    &:hover {
-      opacity: 1;
-      color: $comments-muted !important;
-      text-decoration: underline;
+    .copy-link-input-wrapper {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .copy-link-input {
+      flex: 1;
+      background: $comments-surface;
+      border: 1px solid $comments-input-border;
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 0.85rem;
+      color: $comments-text;
+      width: 100%;
+
+      &:focus {
+        outline: none;
+        border-color: $comments-primary;
+      }
+    }
+
+    .copy-link-btn {
+      background: $comments-primary;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background-color 0.2s;
+
+      &:hover {
+        background-color: darken($comments-primary, 10%);
+      }
+
+      &.copied {
+        background-color: #2ecc71;
+      }
     }
   }
 }
 
+// Styling for comments that have been deleted (dimmed, dashed border, italic text)
 .comment-container.comment-deleted {
   opacity: 0.6;
   border-style: dashed;
@@ -483,6 +578,7 @@ $comments-score-neutral: mix($text-color, $background-color, 62%);
   }
 }
 
+// Responsive layout adjustments for comment indentation and threads
 @media (max-width: 900px) {
   .comment-container {
     margin-inline-start: calc(var(--comment-indent, 0) * 10px);
@@ -500,6 +596,7 @@ $comments-score-neutral: mix($text-color, $background-color, 62%);
   }
 }
 
+// Fade-in animation for dynamic comment loading and reply forms
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -512,6 +609,7 @@ $comments-score-neutral: mix($text-color, $background-color, 62%);
   }
 }
 
+// Main comment form for creating new top-level comments
 .comment-form {
   display: block;
   margin-top: 12px;
@@ -562,22 +660,7 @@ $comments-score-neutral: mix($text-color, $background-color, 62%);
 
   .input-container {
     textarea {
-      width: 100%;
-      max-width: 100%;
-      box-sizing: border-box;
       min-height: 76px;
-      padding: 10px 12px;
-      border: 1px solid $comments-input-border;
-      border-radius: 10px;
-      resize: vertical;
-      font-size: 14px;
-      color: $comments-text;
-      background-color: $comments-surface-strong;
-
-      &:focus {
-        border-color: $comments-primary;
-        outline: none;
-      }
     }
 
     .actions {
@@ -602,6 +685,7 @@ $comments-score-neutral: mix($text-color, $background-color, 62%);
   }
 }
 
+// Authentication state markers to show/hide content based on login status
 .auth-protected-content {
   display: none;
 }
@@ -623,6 +707,7 @@ body.logged-out {
 
   .comments .auth-login-container {
     display: block;
+    margin: 12px;
   }
 }
 
@@ -646,20 +731,7 @@ body.logged-out {
   }
 }
 
-.button {
-  font-size: 14px;
-  padding: 4px;
-  margin: 4px;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background-color: rgba(0, 0, 0, 0.01);
-  transition: background-color 0.3s ease;
-}
-
+// Generic icon utility using CSS mask
 .c-icon {
   display: inline-block;
   width: $icon-size;
@@ -674,6 +746,28 @@ body.logged-out {
   transition: background-color 0.2s;
 }
 
+// Shared styles for comment textareas (main form and reply form)
+.comment-reply textarea.comment-input,
+.comment-form .input-container textarea {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid $comments-input-border;
+  border-radius: 10px;
+  resize: vertical;
+  font-size: 14px;
+  color: $comments-text;
+  background-color: $comments-surface-strong;
+
+  &:focus {
+    border-color: $comments-primary;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba($comments-primary, 0.16);
+  }
+}
+
+// Voting button styles (Like/Dislike) with active states and SVG masks
 .like-button {
   &:hover .c-icon {
     background-color: darken($comments-icon, 12%);
@@ -703,13 +797,7 @@ body.logged-out {
   }
 
   .c-icon {
-    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' height='24' viewBox='0 0 24 24' width='24'%3E%3Cpath d='M24 24H0V0h24v24z' fill='none'/%3E%3Cpath d='M10.89 18.28l.57-2.89c.12-.59-.04-1.2-.42-1.66-.38-.46-.94-.73-1.54-.73H4v-1.08L6.57 6h8.09c.18 0 .34.16.34.34v7.84l-4.11 4.1M10 22l6.41-6.41c.38-.38.59-.89.59-1.42V6.34C17 5.05 15.95 4 14.66 4h-8.1c-.71 0-1.36.37-1.72.97l-2.67 6.15c-.11.25-.17.52-.17.8V13c0 1.1.9 2 2 2h5.5l-.92 4.65c-.05.22-.02.46.08.66.23.45.52.86.88 1.22L10 22zm10-7h2V4h-2c-.55 0-1 .45-1 1v9c0 .55.45 1 1 1z'/%3E%3C/svg%3E");
-    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' height='24' viewBox='0 0 24 24' width='24'%3E%3Cpath d='M24 24H0V0h24v24z' fill='none'/%3E%3Cpath d='M10.89 18.28l.57-2.89c.12-.59-.04-1.2-.42-1.66-.38-.46-.94-.73-1.54-.73H4v-1.08L6.57 6h8.09c.18 0 .34.16.34.34v7.84l-4.11 4.1M10 22l6.41-6.41c.38-.38.59-.89.59-1.42V6.34C17 5.05 15.95 4 14.66 4h-8.1c-.71 0-1.36.37-1.72.97l-2.67 6.15c-.11.25-.17.52-.17.8V13c0 1.1.9 2 2 2h5.5l-.92 4.65c-.05.22-.02.46.08.66.23.45.52.86.88 1.22L10 22zm10-7h2V4h-2c-.55 0-1 .45-1 1v9c0 .55.45 1 1 1z'/%3E%3C/svg%3E");
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' height='24' viewBox='0 0 24 24' width='24'%3E%3Cpath d='M24 24H0V0h24v24z' fill='none'/%3E%3Cpath d='M10.89 18.28l.57-2.89c.12-.59-.04-1.2-.42-1.66-.38-.46-.94-.73-1.54-.73H4v-1.08L6.57 6h8.09c.18 0 .34.16.34.34v7.84l-4.11 4.1M10 22l6.41-6.41c.38-.38.59-.89.59-1.42V6.34C17 5.05 15.95 4 14.66 4h-8.1c-.71 0-1.36.37-1.72.97l-2.67 6.15c-.11.25-.17-.52-.17.8V13c0 1.1.9 2 2 2h5.5l-.92 4.65c-.05.22-.02.46.08.66.23.45.52.86.88 1.22L10 22zm10-7h2V4h-2c-.55 0-1 .45-1 1v9c0 .55.45 1 1 1z'/%3E%3C/svg%3E");
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' height='24' viewBox='0 0 24 24' width='24'%3E%3Cpath d='M24 24H0V0h24v24z' fill='none'/%3E%3Cpath d='M10.89 18.28l.57-2.89c.12-.59-.04-1.2-.42-1.66-.38-.46-.94-.73-1.54-.73H4v-1.08L6.57 6h8.09c.18 0 .34.16.34.34v7.84l-4.11 4.1M10 22l6.41-6.41c.38-.38.59-.89.59-1.42V6.34C17 5.05 15.95 4 14.66 4h-8.1c-.71 0-1.36.37-1.72.97l-2.67 6.15c-.11.25-.17-.52-.17.8V13c0 1.1.9 2 2 2h5.5l-.92 4.65c-.05.22-.02.46.08.66.23.45.52.86.88 1.22L10 22zm10-7h2V4h-2c-.55 0-1 .45-1 1v9c0 .55.45 1 1 1z'/%3E%3C/svg%3E");
   }
 }
-
-// .like-count,
-// .dislike-count {
-//   font-size: $comments-count-font-size;
-//   position: relative;
-// }

@@ -14,7 +14,7 @@ export function isLoggedIn(): boolean {
     return !!getAuthToken()
 }
 
-export function logout() {
+export function clearAuth() {
     try {
         localStorage.removeItem(AUTH_STORAGE_KEY)
         sessionStorage.removeItem(AUTH_STORAGE_KEY)
@@ -23,6 +23,10 @@ export function logout() {
         console.error("Auth: Failed to clear storage", e)
     }
     updateAuthUI()
+}
+
+export function logout() {
+    clearAuth()
     window.location.reload()
 }
 
