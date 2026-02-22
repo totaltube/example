@@ -35,6 +35,10 @@
 		<link type="text/css" rel="stylesheet" href="{{ static("gallery.css") }}">
 		<script defer src="{{ static("gallery.js") }}"></script>
 	{% endif %}
+	{% if global_config.Comments.ApiUrl %}
+		<link rel="stylesheet" href="http://localhost:23366/dist/TotaltubeComments.css">
+		<script src="http://localhost:23366/dist/TotaltubeComments.js"></script>
+	{% endif %}
 {% endblock %}
 {% block body %}
 	{% import "common/show-content.twig" show_content %}

@@ -1,117 +1,31 @@
 {# Comments Template - Main wrapper for the comments section #}
-{% set comments_per_page = 10 %}
-{% fetch "comments", amount = comments_per_page, sort = "threads_recent", replies_limit = 2, hot_size = 3, hot_min_likes = 2 %}
-    <div
-        class="comments"
-        data-content-id="{{ content_item.Id }}"
-        data-site-id="{{ config.SiteId }}"
-        data-sort="threads_recent"
-        data-size="{{ comments_per_page }}"
-        data-hot-size="2"
-        data-hot-min-likes="2"
-        data-initial-replies-limit="2"
-        data-thread-direct-size="30"
-        data-thread-replies-limit="5"
-        data-i18n-replying-to="{{ translate("Replying to") }}"
-        data-i18n-no-comments="{{ translate("No comments yet.") }}"
-        data-i18n-loading="{{ translate("Loading...") }}"
-        data-i18n-comment-deleted="{{ translate("Comment deleted") }}"
-        data-i18n-comment-deleted-by-user="{{ translate("Comment deleted by user") }}"
-        data-i18n-comment-moderated="{{ translate("Comment moderated") }}"
-        data-i18n-delete-confirm="{{ translate("Delete this comment?") }}"
-        data-i18n-reply="{{ translate("Reply") }}"
-        data-comment-page="1"
-        data-comments-total="{{ comments.Total }}"
-    >
-        {# Main commenting form (visible only when logged in) #}
-        <div class="comment-form auth-protected-content">
-            <div class="auth-profile" style="display: none;">
-                <div class="auth-user-info">
-                    <img class="auth-user-avatar" src="/images/avatar_placeholder.png" alt="User">
-                    <span class="auth-user-name"></span>
+{% fetch "comments", amount = 30 %}
+<script>
+    
+</script>
+    <div id="comments">
+        <div id="ssr-placeholder" style="display: none;">
+            {% for comment in comments.Comments %}
+                <div class="comment-item" itemprop="comment" itemscope itemtype="https://schema.org/Comment">
+                    <div itemprop="author" itemscope itemtype="https://schema.org/Person">
+                        <span itemprop="name">{{ comment.Nick }}</span>
+                    </div>
+                    <meta itemprop="datePublished" content="{{ comment.Date }}">
+                    <div itemprop="text">
+                        {{ comment.ContentMarked | safe }}
+                    </div>
+                    <!-- If we have likes -->
+                    <div itemprop="interactionStatistic" itemscope itemtype="https://schema.org/InteractionCounter">
+                        <meta itemprop="interactionType" content="https://schema.org/LikeAction"/>
+                        <span itemprop="userInteractionCount">{{ comment.VoteUp }}</span>
+                    </div>
+                    <!-- if we have dislikes -->
+                    <div itemprop="interactionStatistic" itemscope itemtype="https://schema.org/InteractionCounter">
+                        <meta itemprop="interactionType" content="https://schema.org/DislikeAction"/>
+                        <span itemprop="userInteractionCount">{{ comment.VoteDown }}</span>
+                    </div>
                 </div>
-                <a href="#" class="auth-logout-btn">{{ translate("Logout") }}</a>
-            </div>
-            <div class="input-container">
-                <textarea placeholder="{{ translate("Write a comment") }}"></textarea>
-                <div class="actions">
-                    <button class="submit-btn">{{ translate("Send") }}</button>
-                </div>
-            </div>
-        </div>
-        {# Login prompt (visible only when logged out) #}
-        <div class="auth-login-container">
-            <button class="auth-login-btn">{{ translate("Login to comment") }}</button>
-        </div>
-
-        {# Main comments list (hydrated via JS) #}
-        <ul class="comments-list comments-list-hidden-until-js">
-        {% if comments.HotItems or comments.Items %}
-            {% if comments.HotItems %}
-                {% for comment in comments.HotItems %}
-                    {% include "../comment-item.twig" %}
-                {% endfor %}
-            {% endif %}
-            {% for comment in comments.Items %}
-                {% include "../comment-item.twig" %}
             {% endfor %}
-        {% else %}
-            <li><p>{{ translate("No comments yet.") }}</p></li>
-        {% endif %}
-        </ul>
-        <div class="comments-loading hidden">{{ translate("Loading...") }}</div>
-        <div class="comments-sentinel"></div>
-
+        </div>
     </div>
 {% endfetch %}
-
-    </li>
-</template>
-
-{# JavaScript Comment Template - hidden block used by the frontend JS to clone comments #}
-<template id="comment-template-js">
-    <li>
-        <div class="comment-container" id="" data-comment-id="" data-parent-id="0" data-reply-count="0" data-indent="0" data-status="" data-user-id="0" style="--comment-indent: 0;">
-            <div class="avatar">
-                <img src="/images/avatar_placeholder.png" alt="User Avatar">
-            </div>
-            <div class="comment-content">
-                <div class="comment-header">
-                     <div class="comment-info">
-                        <span class="comment-username"></span>
-                        <span class="comment-date"></span>
-                        <div class="comment-context hidden"></div>
-                     </div>
-                     <div class="comment-header-actions">
-                        <button class="like-button" aria-label="{{ translate("Like") }}">
-                            <span class="c-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg></span>
-                        </button>
-                        <span class="score-count">0</span>
-                        <button class="dislike-button" aria-label="{{ translate("Dislike") }}">
-                            <span class="c-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/></svg></span>
-                        </button>
-                        <div class="comment-menu-container hidden">
-                            <button class="comment-menu-btn" aria-label="{{ translate("Menu") }}">
-                                <span class="c-icon"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="12" x2="20" y2="12"></line><line x1="4" y1="6" x2="20" y2="6"></line><line x1="4" y1="18" x2="20" y2="18"></line></svg></span>
-                            </button>
-                            <div class="comment-menu-dropdown hidden">
-                                <a class="comment-permalink dropdown-item" href="#" aria-label="{{ translate("Permalink") }}">{{ translate("Link") }}</a>
-                                <button class="delete-button dropdown-item">{{ translate("Delete") }}</button>
-                            </div>
-                        </div>
-                     </div>
-                </div>
-                
-                <div class="comment-text"></div>
-                
-                <div class="comment-actions">
-                    <button class="reply-button">{{ translate("Reply") }}</button>
-                </div>
-                <div class="comment-reply">
-                    <textarea class="comment-input" placeholder="{{ translate("Write a reply...") }}"></textarea>
-                    <button class="send-comment-button">{{ translate("Reply") }}</button>
-                </div>
-            </div>
-        </div>
-    </li>
-</template>

@@ -37,3 +37,7 @@ password = "" # SMTP password
 address_from = "" # From address
 address_reply = "" # Reply address
 timeout = 10 # Timeout for SMTP connection in seconds
+
+[comments]
+api_url = "http://localhost:23366/api/v2"
+separate_comments_by_site = false

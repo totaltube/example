@@ -3,8 +3,6 @@
 
 import autocomplete, { AutocompleteItem } from "autocompleter"
 import micromodal from "micromodal"
-import "./comments"
-import { initAuth } from "./auth"
 
 // var defined in layout.twig
 export type Globals = {
@@ -37,7 +35,6 @@ export type Globals = {
 document.addEventListener("DOMContentLoaded", function () {
     // globals is the object containing some vars defined in layout.twig
     const globals = (window as any).globals as Globals
-    initAuth(globals.auth_url)
     // Add global indexes to thumb links if not already present
     const firstThumbLink = document.querySelector(".thumbs a.thumb-link")
     if (firstThumbLink && !firstThumbLink.hasAttribute("data-index")) {

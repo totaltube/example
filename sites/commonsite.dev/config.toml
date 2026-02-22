@@ -78,9 +78,8 @@ pagination_max_rendered_links = 15 # Maximum rendered page links, default 10
 models_per_page = 20 # Number of models per page on models page
 content_related_amount = 20 # Number of related videos on content item page
 fake_video_page = true # Show fake video page for video links
-	disable_categories_redirect = true # if true - redirect to category from top categories page based on referrer will be disabled.
-	debug = false
-	separate_comments_by_site = false
+disable_categories_redirect = true # if true - redirect to category from top categories page based on referrer will be disabled.
+debug = false
 
 [custom] # Some custom configuration options available in template as config.Custom.your_option
 	site_title = "Common site"
@@ -95,7 +94,7 @@ default_video_format = "main" # default format for hosted video.
 default_gallery_format = "main" #default format for picture gallery
 
 [javascript]
-entries = ["main.ts", "video.ts", "video-hosted.ts", "gallery.ts", "comments.ts"] # main javascrypt/typescrypt source entry files to build the bundle/bundles
+entries = ["main.ts", "video.ts", "video-hosted.ts", "gallery.ts"] # main javascrypt/typescrypt source entry files to build the bundle/bundles
 destination = "" # destination path relative to public path. If empty - destination path = public path.
 minify = true # minify resulting javascript
 
