@@ -1,7 +1,16 @@
 {# Comments Template - Main wrapper for the comments section #}
 {% fetch "comments", amount = 30 %}
 <script>
-    
+    document.addEventListener('DOMContentLoaded', function() {
+        TotaltubeComments.init({
+            el: '#comments',          
+            pageKey: 'c_{{content_item.Id}}', // Unique page key
+            server: 'http://localhost:23366',  // Backend server
+            site: '{{config.Hostname}}',           // Site name from admin panel
+            // Here you can add more options if needed
+            all_sites: true,
+        });
+    });
 </script>
     <div id="comments">
         <div id="ssr-placeholder" style="display: none;">
