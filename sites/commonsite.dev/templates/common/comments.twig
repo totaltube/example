@@ -1,5 +1,5 @@
 {# Comments Template - Main wrapper for the comments section #}
-{% fetch "comments", amount = 30 %}
+{% fetch "comments", amount = 100 %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         TotaltubeComments.init({
@@ -9,6 +9,7 @@
             site: '{{config.Hostname}}',           // Site name from admin panel
             // Here you can add more options if needed
             all_sites: true,
+            locale: '{{ lang.Id }}',
         });
     });
 </script>

@@ -107,3 +107,10 @@ minify = true # minify resulting css
 
 [sitemap]
 max_links=2
+[language_domains]
+default = "cocogals.com"
+ar = "ar.cocogals.com:dedicated"
+hi = "hi.cocogals.com:dedicated"
+ru = "ru.cocogals.com:dedicated"
+tr = "cocogals.onl:dedicated"
+zh-Hans = "cocogals.pics:dedicated"
